@@ -10,9 +10,17 @@ In Foundry's setup screen, open **Add-on Modules → Install Module** and paste 
 https://github.com/nathan-rive/foundary-rive/releases/latest/download/module.json
 ```
 
-## Status
+## Rive journal pages
 
-Phase 0 (scaffold and spikes). This build has no journal integration yet. It provides:
+Add a page to a journal and choose the **Rive** page type. In the page's edit view you can:
+
+- upload a `.riv` file from your computer (GMs, or anyone with the file-upload permission), or pick an uploaded `.riv.json` file, or paste a URL to a `.riv` file
+- pick the artboard and state machine from the ones the file contains
+- set the fit, alignment, aspect ratio, autoplay, and caption
+
+Players see the animation playing inside the journal.
+
+## Developer tools
 
 - `game.modules.get("foundry-rive").api.openTestDialog()` plays a sample `.riv` in a dialog.
 - `await game.modules.get("foundry-rive").api.spikes.all()` runs the WASM, upload, leak and scene-context checks.

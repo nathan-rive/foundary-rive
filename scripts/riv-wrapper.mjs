@@ -55,7 +55,11 @@ export async function wrap(riv, name) {
  */
 export async function uploadRiv(file, { source = "data", dir = "rive" } = {}) {
   const wrapped = await wrap(file, file.name);
-  await FilePicker.createDirectory(source, dir).catch(() => {});
+  // createDirectory isn't recursive, and fails harmlessly when a folder exists.
+  const parts = dir.split("/");
+  for (let i = 1; i <= parts.length; i++) {
+    await FilePicker.createDirectory(source, parts.slice(0, i).join("/")).catch(() => {});
+  }
   const response = await FilePicker.upload(source, dir, wrapped, {}, { notify: false });
   if (!response?.path) throw new Error(`Rive: upload of ${file.name} failed`);
   return response.path;

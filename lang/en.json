@@ -1,0 +1,41 @@
+{
+  "FOUNDRY_RIVE": {
+    "PageType": "Rive",
+    "Source": "Rive File",
+    "SourceHint": "A path to an uploaded .riv.json file or a URL to a .riv file. Use the upload button to add a .riv file from your computer.",
+    "Upload": "Upload .riv file",
+    "Uploading": "Uploading {name}…",
+    "UploadFailed": "Couldn't upload {name}: {error}",
+    "Artboard": "Artboard",
+    "StateMachine": "State Machine",
+    "FileDefault": "File default",
+    "FitLabel": "Fit",
+    "AlignmentLabel": "Alignment",
+    "AspectRatio": "Aspect Ratio",
+    "AspectRatioHint": "Width / height of the player, for example 16 / 9 or 1.",
+    "Autoplay": "Play automatically",
+    "Caption": "Caption",
+    "NoSource": "Choose or upload a Rive file to preview it here.",
+    "LoadFailed": "Couldn't load this Rive file: {error}",
+    "Fit": {
+      "contain": "Contain",
+      "cover": "Cover",
+      "fill": "Fill",
+      "fitWidth": "Fit width",
+      "fitHeight": "Fit height",
+      "scaleDown": "Scale down",
+      "none": "None"
+    },
+    "Alignment": {
+      "top-left": "Top left",
+      "top-center": "Top center",
+      "top-right": "Top right",
+      "center-left": "Center left",
+      "center": "Center",
+      "center-right": "Center right",
+      "bottom-left": "Bottom left",
+      "bottom-center": "Bottom center",
+      "bottom-right": "Bottom right"
+    }
+  }
+}

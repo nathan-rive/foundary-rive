@@ -1,0 +1,111 @@
+import { MODULE_ID } from "../constants.mjs";
+import { RivePlayer } from "../rive-player.mjs";
+import { uploadRiv } from "../riv-wrapper.mjs";
+import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
+
+/**
+ * v12 (AppV1) sheet for "foundry-rive.rive" pages. The journal sheet renders it
+ * twice over: in view mode (editable: false) inside the journal, and as its own
+ * window in edit mode. Both mount a player in activateListeners.
+ */
+export class RivePageSheet extends JournalPageSheet {
+  #player = null;
+
+  static get defaultOptions() {
+    const options = super.defaultOptions;
+    options.classes.push("rive-page");
+    options.height = "auto";
+    options.submitOnChange = true;
+    return options;
+  }
+
+  get template() {
+    return `modules/${MODULE_ID}/templates/rive-page-${this.isEditable ? "edit" : "view"}.hbs`;
+  }
+
+  getData(options = {}) {
+    const data = super.getData(options);
+    data.system = this.document.system;
+    data.fits = FITS;
+    data.alignments = ALIGNMENTS;
+    data.canUpload = game.user.can("FILES_UPLOAD");
+    return data;
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    this.#destroyPlayer();
+    const canvas = html.find("canvas.rive-canvas")[0];
+    if (canvas) this.#mount(canvas, html);
+    if (this.isEditable) {
+      html.find(".rive-upload-button").on("click", () => html.find("input.rive-upload")[0]?.click());
+      html.find("input.rive-upload").on("change", event => this.#onUpload(event));
+    }
+  }
+
+  async #mount(canvas, html) {
+    const status = html.find(".rive-status")[0];
+    const { src } = this.document.system;
+    if (!src) {
+      if (status) status.textContent = game.i18n.localize("FOUNDRY_RIVE.NoSource");
+      return;
+    }
+    try {
+      const player = await RivePlayer.mount(canvas, this.document.system.playerOptions);
+      // A re-render may have started while we were loading.
+      if (!canvas.isConnected) return player.destroy();
+      this.#player = player;
+      if (this.isEditable) this.#fillChoices(html, player.contents);
+    } catch (err) {
+      console.error(`${MODULE_ID} |`, err);
+      if (status) status.textContent = game.i18n.format("FOUNDRY_RIVE.LoadFailed", { error: err.message });
+    }
+  }
+
+  /** Artboard and state machine dropdowns list what the loaded file contains. */
+  #fillChoices(html, contents) {
+    const { artboard, stateMachine } = this.document.system;
+    const boards = contents?.artboards ?? [];
+    const fill = (select, names, current) => {
+      if (!select) return;
+      const blank = `<option value="">${game.i18n.localize("FOUNDRY_RIVE.FileDefault")}</option>`;
+      select.innerHTML = blank + names.map(n => {
+        const name = foundry.utils.escapeHTML(n);
+        return `<option value="${name}" ${n === current ? "selected" : ""}>${name}</option>`;
+      }).join("");
+    };
+    fill(html.find("select[name='system.artboard']")[0], boards.map(a => a.name), artboard);
+    const board = boards.find(a => a.name === artboard) ?? boards[0];
+    fill(html.find("select[name='system.stateMachine']")[0], board?.stateMachines.map(s => s.name) ?? [], stateMachine);
+  }
+
+  async #onUpload(event) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    const notice = ui.notifications.info(game.i18n.format("FOUNDRY_RIVE.Uploading", { name: file.name }), { permanent: true });
+    try {
+      const src = await uploadRiv(file, { dir: `rive/${game.world.id}` });
+      await this.document.update({ "system.src": src, "system.artboard": "", "system.stateMachine": "" });
+    } catch (err) {
+      ui.notifications.error(game.i18n.format("FOUNDRY_RIVE.UploadFailed", { name: file.name, error: err.message }));
+    } finally {
+      ui.notifications.remove?.(notice);
+    }
+  }
+
+  #destroyPlayer() {
+    this.#player?.destroy();
+    this.#player = null;
+  }
+
+  /** Called by the journal sheet when this page's view is closed or replaced. */
+  _closeView() {
+    this.#destroyPlayer();
+    super._closeView();
+  }
+
+  async close(options) {
+    this.#destroyPlayer();
+    return super.close(options);
+  }
+}

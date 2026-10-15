@@ -1,0 +1,30 @@
+.rive-figure {
+  margin: 0 0 0.5rem;
+}
+
+.rive-stage {
+  width: 100%;
+  position: relative;
+}
+
+.rive-stage .rive-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.rive-status:empty {
+  display: none;
+}
+
+.rive-status {
+  font-style: italic;
+  color: var(--color-text-dark-secondary, #4b4a44);
+}
+
+.rive-figure figcaption {
+  text-align: center;
+  font-style: italic;
+}

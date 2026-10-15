@@ -9,6 +9,18 @@ export class RivePlayer {
   /** Every live player, so leaks show up as a growing count. */
   static live = new Set();
 
+  /**
+   * Backstop for adapters that miss a teardown: destroys players whose canvas
+   * was in the page when it loaded and has since been removed.
+   */
+  static sweep() {
+    for (const player of RivePlayer.live) {
+      if (player.#wasConnected && !player.#canvas?.isConnected) player.destroy();
+    }
+  }
+
+  #wasConnected = false;
+
   #rive = null;
   #canvas = null;
   #resizeObserver = null;
@@ -52,10 +64,13 @@ export class RivePlayer {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
+    // Foundry paths like "rive/world/x.riv.json" need the route prefix; URLs pass through.
+    if (src && !/^([a-z][a-z\d+.-]*:|\/)/i.test(src)) src = foundry.utils.getRoute(src);
     // Uploaded files arrive as .riv.json wrappers (see riv-wrapper.mjs).
     if (src && !buffer && isWrappedPath(src)) {
       buffer = await fetchWrapped(src);
       src = undefined;
+      if (!this.#canvas) throw new Error("Rive: player destroyed while loading");
     }
     return new Promise((resolve, reject) => {
       this.#rive = new Rive({
@@ -68,6 +83,7 @@ export class RivePlayer {
         autoBind: true,
         layout: new Layout({ fit: Fit[capitalize(fit)], alignment: Alignment[camel(alignment)] }),
         onLoad: () => {
+          if (!this.#rive) return reject(new Error("Rive: player destroyed while loading"));
           // Without a named state machine Rive only plays the first timeline; prefer the artboard's first state machine.
           if (!stateMachine) {
             const board = this.#rive.contents?.artboards?.find(a => !artboard || a.name === artboard);
@@ -79,6 +95,7 @@ export class RivePlayer {
             }
           }
           this.#rive.resizeDrawingSurfaceToCanvas();
+          this.#wasConnected = canvas.isConnected;
           this.#observe();
           resolve(this);
         },

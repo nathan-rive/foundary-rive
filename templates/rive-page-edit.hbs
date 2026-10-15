@@ -1,0 +1,85 @@
+<form class="{{cssClass}} flexcol" autocomplete="off">
+    {{> journalEntryPageHeader}}
+
+    <figure class="rive-figure">
+        <div class="rive-stage" style="aspect-ratio: {{system.aspectRatio}}">
+            <canvas class="rive-canvas"></canvas>
+        </div>
+        <p class="rive-status"></p>
+    </figure>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.Source"}}</label>
+        <div class="form-fields">
+            <input type="text" name="system.src" value="{{system.src}}" placeholder="rive/world/file.riv.json">
+            <button type="button" class="file-picker" data-type="text" data-target="system.src" data-tooltip="FILES.BrowseTooltip" tabindex="-1">
+                <i class="fa-solid fa-file-import fa-fw"></i>
+            </button>
+            {{#if canUpload}}
+            <button type="button" class="rive-upload-button" data-tooltip="FOUNDRY_RIVE.Upload" tabindex="-1">
+                <i class="fa-solid fa-upload fa-fw"></i>
+            </button>
+            <input type="file" class="rive-upload" accept=".riv" hidden>
+            {{/if}}
+        </div>
+        <p class="hint">{{localize "FOUNDRY_RIVE.SourceHint"}}</p>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.Artboard"}}</label>
+        <div class="form-fields">
+            <select name="system.artboard">
+                <option value="">{{localize "FOUNDRY_RIVE.FileDefault"}}</option>
+                {{#if system.artboard}}<option value="{{system.artboard}}" selected>{{system.artboard}}</option>{{/if}}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.StateMachine"}}</label>
+        <div class="form-fields">
+            <select name="system.stateMachine">
+                <option value="">{{localize "FOUNDRY_RIVE.FileDefault"}}</option>
+                {{#if system.stateMachine}}<option value="{{system.stateMachine}}" selected>{{system.stateMachine}}</option>{{/if}}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.FitLabel"}}</label>
+        <div class="form-fields">
+            <select name="system.fit">{{selectOptions fits selected=system.fit localize=true}}</select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.AlignmentLabel"}}</label>
+        <div class="form-fields">
+            <select name="system.alignment">{{selectOptions alignments selected=system.alignment localize=true}}</select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.AspectRatio"}}</label>
+        <div class="form-fields">
+            <input type="text" name="system.aspectRatio" value="{{system.aspectRatio}}">
+        </div>
+        <p class="hint">{{localize "FOUNDRY_RIVE.AspectRatioHint"}}</p>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.Autoplay"}}</label>
+        <div class="form-fields">
+            <input type="checkbox" name="system.autoplay" {{checked system.autoplay}}>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FOUNDRY_RIVE.Caption"}}</label>
+        <div class="form-fields">
+            <input type="text" name="system.caption" value="{{system.caption}}">
+        </div>
+    </div>
+
+    {{> journalEntryPageFooter}}
+</form>
