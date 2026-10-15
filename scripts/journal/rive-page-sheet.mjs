@@ -3,6 +3,8 @@ import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
 import { fitStage, initialRatio } from "../stage.mjs";
+import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
+import { renderStateEditor } from "./state-editor.mjs";
 
 /**
  * v12 (AppV1) sheet for "foundry-rive.rive" pages. The journal sheet renders it
@@ -57,8 +59,16 @@ export class RivePageSheet extends JournalPageSheet {
       // A re-render may have started while we were loading.
       if (!canvas.isConnected) return player.destroy();
       this.#player = player;
-      fitStage(canvas.closest(".rive-stage"), player, this.document.system.aspectRatio);
-      if (this.isEditable) this.#fillChoices(html, player.contents);
+      const system = this.document.system;
+      fitStage(canvas.closest(".rive-stage"), player, system.aspectRatio);
+      applyInputs(player, system.inputs);
+      applyProperties(player, system.properties);
+      player.onDestroy(bindProperties(player, system.bindings));
+      if (this.isEditable) {
+        this.#fillChoices(html, player.contents);
+        const container = html.find(".rive-state")[0];
+        if (container) renderStateEditor(container, player, system, changes => this.document.update(changes));
+      }
     } catch (err) {
       console.error(`${MODULE_ID} |`, err);
       if (status) status.textContent = game.i18n.format("FOUNDRY_RIVE.LoadFailed", { error: err.message });
@@ -87,7 +97,15 @@ export class RivePageSheet extends JournalPageSheet {
     const notice = ui.notifications.info(game.i18n.format("FOUNDRY_RIVE.Uploading", { name: file.name }), { permanent: true });
     try {
       const src = await uploadRiv(file, { dir: `rive/${game.world.id}` });
-      await this.document.update({ "system.src": src, "system.artboard": "", "system.stateMachine": "" });
+      // A new file means new inputs and properties; old values may not apply.
+      await this.document.update({
+        "system.src": src,
+        "system.artboard": "",
+        "system.stateMachine": "",
+        "system.inputs": [],
+        "system.properties": [],
+        "system.bindings": []
+      });
     } catch (err) {
       ui.notifications.error(game.i18n.format("FOUNDRY_RIVE.UploadFailed", { name: file.name, error: err.message }));
     } finally {

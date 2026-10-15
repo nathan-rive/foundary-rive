@@ -20,6 +20,12 @@ export class RivePlayer {
   }
 
   #wasConnected = false;
+  #teardowns = [];
+
+  /** Runs `fn` when the player is destroyed (e.g. to remove hooks it set up). */
+  onDestroy(fn) {
+    this.#teardowns.push(fn);
+  }
 
   #rive = null;
   #canvas = null;
@@ -136,6 +142,7 @@ export class RivePlayer {
 
   /** Frees the native Rive objects. Safe to call more than once. */
   destroy() {
+    for (const fn of this.#teardowns.splice(0)) fn();
     this.#resizeObserver?.disconnect();
     this.#visibilityObserver?.disconnect();
     this.#rive?.cleanup();

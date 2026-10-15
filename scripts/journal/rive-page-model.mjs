@@ -25,7 +25,7 @@ import { AUTO, isAspectRatio } from "../stage.mjs";
 /** Data for a "foundry-rive.rive" journal page. */
 export class RivePageModel extends foundry.abstract.TypeDataModel {
   static defineSchema() {
-    const { StringField, BooleanField } = foundry.data.fields;
+    const { StringField, BooleanField, ArrayField, SchemaField } = foundry.data.fields;
     return {
       src: new StringField({ required: true, blank: true, initial: "" }),
       artboard: new StringField({ required: true, blank: true, initial: "" }),
@@ -39,7 +39,22 @@ export class RivePageModel extends foundry.abstract.TypeDataModel {
         validationError: "must be auto or look like 16 / 9"
       }),
       autoplay: new BooleanField({ initial: true }),
-      caption: new StringField({ required: true, blank: true, initial: "" })
+      caption: new StringField({ required: true, blank: true, initial: "" }),
+      // Values are strings, coerced by the type the file reports (see state.mjs).
+      inputs: new ArrayField(new SchemaField({
+        name: new StringField({ required: true, blank: false }),
+        value: new StringField({ required: true, blank: true, initial: "" })
+      })),
+      properties: new ArrayField(new SchemaField({
+        name: new StringField({ required: true, blank: false }),
+        value: new StringField({ required: true, blank: true, initial: "" })
+      })),
+      // View model property <- a Foundry document's data, e.g. an Actor's system.attributes.hp.value.
+      bindings: new ArrayField(new SchemaField({
+        name: new StringField({ required: true, blank: false }),
+        uuid: new StringField({ required: true, blank: true, initial: "" }),
+        path: new StringField({ required: true, blank: true, initial: "" })
+      }))
     };
   }
 
