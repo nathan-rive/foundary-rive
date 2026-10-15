@@ -105,6 +105,11 @@ export class RivePlayer {
               this.#rive.stop();
               this.#rive.play(first, autoplay);
               if (!autoplay) this.#rive.pause();
+              // autoBind only bound the state machines that existed at load. Rebind so
+              // this one sees the view model too; without it, view model triggers (and
+              // anything else read only by state machine logic) do nothing.
+              const vmi = this.#rive.viewModelInstance;
+              if (vmi) this.#rive.bindViewModelInstance(vmi);
             }
           }
           this.#rive.resizeDrawingSurfaceToCanvas();
