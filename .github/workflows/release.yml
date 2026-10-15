@@ -1,0 +1,51 @@
+# Publishing a GitHub release tagged vX.Y.Z builds module.zip (with the pinned
+# Rive runtime vendored into lib/) and attaches it plus module.json. Foundry
+# installs from: https://github.com/nathan-rive/foundary-rive/releases/latest/download/module.json
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  RIVE_VERSION: 2.44.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Vendor the Rive runtime
+        run: |
+          npm pack "@rive-app/canvas@${RIVE_VERSION}" --silent
+          mkdir -p lib rive-pkg
+          tar -xzf rive-app-canvas-${RIVE_VERSION}.tgz -C rive-pkg
+          cp rive-pkg/package/rive.js rive-pkg/package/rive.wasm lib/
+          cp rive-pkg/package/LICENSE lib/RIVE-LICENSE 2>/dev/null || true
+
+      - name: Stamp the manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO="https://github.com/${GITHUB_REPOSITORY}"
+          jq --arg v "$VERSION" \
+             --arg manifest "$REPO/releases/latest/download/module.json" \
+             --arg download "$REPO/releases/download/${GITHUB_REF_NAME}/module.zip" \
+             '.version = $v | .manifest = $manifest | .download = $download' \
+             module.json > module.stamped.json
+          mv module.stamped.json module.json
+
+      - name: Zip
+        run: zip -r module.zip module.json scripts lib README.md LICENSE
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" module.json module.zip --clobber

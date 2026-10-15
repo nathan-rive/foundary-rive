@@ -1,1 +1,4 @@
-config
+AdminPassword
+lib/
+node_modules/
+*.tgz
