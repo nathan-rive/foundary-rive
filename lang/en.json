@@ -12,7 +12,7 @@
     "FitLabel": "Fit",
     "AlignmentLabel": "Alignment",
     "AspectRatio": "Aspect Ratio",
-    "AspectRatioHint": "Width / height of the player, for example 16 / 9 or 1.",
+    "AspectRatioHint": "auto matches the artboard. Or give width / height, for example 16 / 9 or 1.",
     "Autoplay": "Play automatically",
     "Caption": "Caption",
     "NoSource": "Choose or upload a Rive file to preview it here.",

@@ -55,6 +55,13 @@ export class RivePlayer {
     return this.#rive;
   }
 
+  /** The loaded artboard's width / height as a CSS aspect-ratio, or null. */
+  get aspectRatio() {
+    const w = this.#rive?.artboardWidth;
+    const h = this.#rive?.artboardHeight;
+    return w > 0 && h > 0 ? `${w} / ${h}` : null;
+  }
+
   /** Artboard and state machine names from the loaded file. */
   get contents() {
     return this.#rive?.contents ?? null;

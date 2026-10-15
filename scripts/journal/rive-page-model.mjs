@@ -20,8 +20,7 @@ export const ALIGNMENTS = {
   "bottom-right": "FOUNDRY_RIVE.Alignment.bottom-right"
 };
 
-/** "16 / 9", "4/3", "1" — goes into a CSS aspect-ratio, so nothing else is allowed. */
-const ASPECT_RATIO = /^\d+(\.\d+)?(\s*\/\s*\d+(\.\d+)?)?$/;
+import { AUTO, isAspectRatio } from "../stage.mjs";
 
 /** Data for a "foundry-rive.rive" journal page. */
 export class RivePageModel extends foundry.abstract.TypeDataModel {
@@ -35,9 +34,9 @@ export class RivePageModel extends foundry.abstract.TypeDataModel {
       alignment: new StringField({ required: true, initial: "center", choices: ALIGNMENTS }),
       aspectRatio: new StringField({
         required: true,
-        initial: "16 / 9",
-        validate: v => ASPECT_RATIO.test(v),
-        validationError: "must look like 16 / 9"
+        initial: AUTO,
+        validate: isAspectRatio,
+        validationError: "must be auto or look like 16 / 9"
       }),
       autoplay: new BooleanField({ initial: true }),
       caption: new StringField({ required: true, blank: true, initial: "" })

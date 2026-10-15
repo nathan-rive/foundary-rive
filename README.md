@@ -18,7 +18,28 @@ Add a page to a journal and choose the **Rive** page type. In the page's edit vi
 - pick the artboard and state machine from the ones the file contains
 - set the fit, alignment, aspect ratio, autoplay, and caption
 
-Players see the animation playing inside the journal.
+Players see the animation playing inside the journal. With the aspect ratio set to `auto` (the default), the player takes the artboard's own proportions.
+
+## Inline embeds
+
+Write `@Rive[...]` anywhere Foundry enriches text: journal text pages, chat messages, item descriptions.
+
+```
+@Rive[rive/my-world/door.riv.json]
+@Rive[https://example.com/door.riv]{sm="State Machine 1" fit=cover ratio=1 caption="The door"}
+```
+
+| Option | Meaning |
+| --- | --- |
+| `artboard` | Artboard name (default: the file's default) |
+| `sm` | State machine name (default: the artboard's first) |
+| `fit` | `contain`, `cover`, `fill`, `fitWidth`, `fitHeight`, `scaleDown`, `none` |
+| `align` | `center`, `top-left`, `top-center`, … `bottom-right` |
+| `ratio` | `auto` (default) or width / height, e.g. `16/9` |
+| `autoplay` | `false` to start paused |
+| `caption` | Text under the player |
+
+Quote values that contain spaces.
 
 ## Developer tools
 

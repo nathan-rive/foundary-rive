@@ -4,6 +4,7 @@ import * as spikes from "./spikes.mjs";
 import * as wrapper from "./riv-wrapper.mjs";
 import { RivePageModel } from "./journal/rive-page-model.mjs";
 import { RivePageSheet } from "./journal/rive-page-sheet.mjs";
+import { activateEmbeds, registerEnricher } from "./enricher.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -21,6 +22,7 @@ Hooks.once("init", () => {
     makeDefault: true,
     label: "FOUNDRY_RIVE.PageType"
   });
+  registerEnricher();
 
   game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE };
 });
@@ -28,9 +30,20 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   globalThis.rive.RuntimeLoader.awaitInstance().catch(err => console.error(`${MODULE_ID} | WASM failed to load`, err));
 
-  // Backstop: free players whose canvas left the page without a teardown.
+  // Inline embeds mount when they enter the page; the debounced sweep frees
+  // players whose canvas left the page without a teardown.
   const sweep = foundry.utils.debounce(() => RivePlayer.sweep(), 1000);
-  new MutationObserver(sweep).observe(document.body, { childList: true, subtree: true });
+  let pending = false;
+  new MutationObserver(() => {
+    sweep();
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      activateEmbeds();
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+  activateEmbeds();
 });
 
 /** Phase 0 gate: a hard-coded .riv playing in a plain dialog. */
