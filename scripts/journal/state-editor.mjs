@@ -36,6 +36,7 @@ export function renderStateEditor(container, player, { values, onChange, onFire,
       const overridden = values[kind].has(item.name);
       const current = overridden ? values[kind].get(item.name) : item.value;
       const control = valueControl(item.type, current, item.options, live, value => onChange(kind, item.name, value));
+      Object.assign(control.dataset, { riveKind: kind, riveName: item.name });
       const reset = !live && overridden ? () => onChange(kind, item.name, null) : null;
       container.append(row(item.name, item.type, control, reset));
       if (bindings && kind === "property") {
@@ -45,6 +46,26 @@ export function renderStateEditor(container, player, { values, onChange, onFire,
   };
   section("input", "FOUNDRY_RIVE.Inputs", inputs);
   section("property", "FOUNDRY_RIVE.Properties", properties);
+}
+
+/**
+ * Shows a value that changed elsewhere (another GM) in an already-built editor,
+ * without firing its change handlers.
+ */
+export function showValue(container, kind, name, value) {
+  const control = [...container.querySelectorAll("[data-rive-kind]")]
+    .find(el => el.dataset.riveKind === kind && el.dataset.riveName === name);
+  if (!control) return;
+  for (const input of control.matches("input, select") ? [control] : control.querySelectorAll("input, select")) {
+    if (input === document.activeElement) continue; // don't fight someone mid-edit
+    if (input.type === "checkbox") input.checked = value === true || value === "true";
+    else if (input.type === "range") {
+      const n = Number(value);
+      if (n > Number(input.max)) input.max = String(Math.ceil(n));
+      if (n < Number(input.min)) input.min = String(Math.floor(n));
+      input.value = String(value);
+    } else input.value = String(value ?? "");
+  }
 }
 
 function valueControl(type, value, options, live, onChange) {

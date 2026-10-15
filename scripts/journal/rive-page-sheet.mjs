@@ -5,7 +5,7 @@ import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
 import { fitStage, initialRatio } from "../stage.mjs";
 import { applyInputs, applyProperties, bindProperties, fireInput, setProperty } from "../state.mjs";
 import * as sync from "../sync.mjs";
-import { renderStateEditor } from "./state-editor.mjs";
+import { renderStateEditor, showValue } from "./state-editor.mjs";
 
 /**
  * v12 (AppV1) sheet for "foundry-rive.rive" pages. The journal sheet renders it
@@ -120,6 +120,11 @@ export class RivePageSheet extends JournalPageSheet {
       onFire: (kind, name) => sync.fire(target, kind, name),
       live: true
     });
+    // Keep this panel current when another GM changes a value.
+    const hookId = Hooks.on(sync.CHANGED_HOOK, (changed, kind, name, value) => {
+      if (changed === target) showValue(container, kind, name, value);
+    });
+    player.onDestroy(() => Hooks.off(sync.CHANGED_HOOK, hookId));
     html.find(".rive-live-save").on("click", () => this.#saveLiveAsDefaults());
   }
 
