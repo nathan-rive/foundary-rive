@@ -68,11 +68,10 @@ export class RivePageSheet extends JournalPageSheet {
     const boards = contents?.artboards ?? [];
     const fill = (select, names, current) => {
       if (!select) return;
-      const blank = `<option value="">${game.i18n.localize("FOUNDRY_RIVE.FileDefault")}</option>`;
-      select.innerHTML = blank + names.map(n => {
-        const name = foundry.utils.escapeHTML(n);
-        return `<option value="${name}" ${n === current ? "selected" : ""}>${name}</option>`;
-      }).join("");
+      select.replaceChildren(
+        new Option(game.i18n.localize("FOUNDRY_RIVE.FileDefault"), ""),
+        ...names.map(n => new Option(n, n, false, n === current))
+      );
     };
     fill(html.find("select[name='system.artboard']")[0], boards.map(a => a.name), artboard);
     const board = boards.find(a => a.name === artboard) ?? boards[0];
