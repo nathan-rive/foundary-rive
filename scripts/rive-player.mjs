@@ -1,4 +1,5 @@
 import { MAX_LIVE_PLAYERS } from "./constants.mjs";
+import { fetchWrapped, isWrappedPath } from "./riv-wrapper.mjs";
 
 /**
  * Thin, framework-agnostic wrapper around one Rive instance on one canvas.
@@ -47,10 +48,15 @@ export class RivePlayer {
     return this.#rive?.contents ?? null;
   }
 
-  #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true }) {
+  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true }) {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
+    // Uploaded files arrive as .riv.json wrappers (see riv-wrapper.mjs).
+    if (src && !buffer && isWrappedPath(src)) {
+      buffer = await fetchWrapped(src);
+      src = undefined;
+    }
     return new Promise((resolve, reject) => {
       this.#rive = new Rive({
         canvas,
@@ -62,6 +68,16 @@ export class RivePlayer {
         autoBind: true,
         layout: new Layout({ fit: Fit[capitalize(fit)], alignment: Alignment[camel(alignment)] }),
         onLoad: () => {
+          // Without a named state machine Rive only plays the first timeline; prefer the artboard's first state machine.
+          if (!stateMachine) {
+            const board = this.#rive.contents?.artboards?.find(a => !artboard || a.name === artboard);
+            const first = board?.stateMachines?.[0]?.name;
+            if (first) {
+              this.#rive.stop();
+              this.#rive.play(first, autoplay);
+              if (!autoplay) this.#rive.pause();
+            }
+          }
           this.#rive.resizeDrawingSurfaceToCanvas();
           this.#observe();
           resolve(this);

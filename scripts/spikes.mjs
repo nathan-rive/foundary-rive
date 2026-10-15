@@ -1,5 +1,6 @@
 import { MODULE_ID, SAMPLE_RIV, WASM_PATH } from "./constants.mjs";
 import { RivePlayer } from "./rive-player.mjs";
+import { uploadRiv } from "./riv-wrapper.mjs";
 
 /**
  * Phase 0 spikes. Each returns a plain result object so it can be run from the
@@ -13,20 +14,21 @@ export async function wasm() {
 }
 
 /**
- * Can a .riv be uploaded through Foundry's normal upload path?
- * Writes `rive-spike/<name>` into the user data folder (GM only).
+ * Raw .riv uploads are refused by the server, so this checks the wrapped route:
+ * wrap, upload to `rive-spike/`, then load the uploaded path back into a player (GM only).
  */
 export async function upload({ src = SAMPLE_RIV, dir = "rive-spike" } = {}) {
   const result = { extensionListed: "riv" in CONST.UPLOADABLE_FILE_EXTENSIONS };
   const bytes = await (await fetch(src)).blob();
-  const file = new File([bytes], src.split("/").pop(), { type: "application/octet-stream" });
+  const file = new File([bytes], src.split("/").pop());
   try {
-    await FilePicker.createDirectory("data", dir).catch(() => {});
-    const response = await FilePicker.upload("data", dir, file, {}, { notify: false });
-    result.uploaded = Boolean(response?.path);
-    result.response = response;
+    result.path = await uploadRiv(file, { dir });
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const player = await RivePlayer.mount(canvas, { src: result.path });
+    result.playsFromUpload = player.rive.isPlaying;
+    player.destroy();
   } catch (err) {
-    result.uploaded = false;
     result.error = String(err?.message ?? err);
   }
   return result;

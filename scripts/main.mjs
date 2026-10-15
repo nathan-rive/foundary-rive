@@ -1,11 +1,12 @@
 import { MODULE_ID, SAMPLE_RIV, WASM_PATH } from "./constants.mjs";
 import { RivePlayer } from "./rive-player.mjs";
 import * as spikes from "./spikes.mjs";
+import * as wrapper from "./riv-wrapper.mjs";
 
 Hooks.once("init", () => {
   // Self-host the WASM instead of letting the runtime fetch it from unpkg.
   globalThis.rive.RuntimeLoader.setWasmUrl(foundry.utils.getRoute(WASM_PATH));
-  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, openTestDialog };
+  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog };
 });
 
 Hooks.once("ready", () => {
