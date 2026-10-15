@@ -20,6 +20,7 @@ export class RivePlayer {
   }
 
   #wasConnected = false;
+  #rebindAfterLoad = false;
   #teardowns = [];
 
   /** Runs `fn` when the player is destroyed (e.g. to remove hooks it set up). */
@@ -51,10 +52,21 @@ export class RivePlayer {
     }
     const player = new RivePlayer();
     RivePlayer.live.add(player);
-    return player.#load(canvas, options).catch(err => {
-      player.destroy();
-      throw err;
-    });
+    return player.#load(canvas, options).then(
+      () => {
+        // autoBind only binds the state machines that existed at load, and the view
+        // model instance isn't available yet inside onLoad. Rebind here so a state
+        // machine we started afterwards sees it too; without this, view model triggers
+        // (and anything else read only by state machine logic) do nothing.
+        const vmi = player.#rive?.viewModelInstance;
+        if (player.#rebindAfterLoad && vmi) player.#rive.bindViewModelInstance(vmi);
+        return player;
+      },
+      err => {
+        player.destroy();
+        throw err;
+      }
+    );
   }
 
   get rive() {
@@ -105,11 +117,7 @@ export class RivePlayer {
               this.#rive.stop();
               this.#rive.play(first, autoplay);
               if (!autoplay) this.#rive.pause();
-              // autoBind only bound the state machines that existed at load. Rebind so
-              // this one sees the view model too; without it, view model triggers (and
-              // anything else read only by state machine logic) do nothing.
-              const vmi = this.#rive.viewModelInstance;
-              if (vmi) this.#rive.bindViewModelInstance(vmi);
+              this.#rebindAfterLoad = true;
             }
           }
           this.#rive.resizeDrawingSurfaceToCanvas();
