@@ -1,95 +1,94 @@
-import { describe, fireInput, setProperty } from "../state.mjs";
+import { describe } from "../state.mjs";
 
 /**
- * Builds the "Inputs" and "Properties" controls in the page edit sheet from
- * what the loaded file offers. Controls are unnamed so the sheet's form submit
- * ignores them; each change is saved through `save(changes)` instead.
+ * Builds controls for a loaded file's state machine inputs and view model
+ * properties. Used two ways:
+ *  - edit sheet: values are saved to the page as defaults (with reset and binding rows)
+ *  - live panel: a GM drives the animation for everyone viewing it (continuous, nothing saved)
+ * Controls are unnamed, so a surrounding sheet form never submits them.
  *
  * @param {HTMLElement} container
  * @param {RivePlayer} player
- * @param {object} system      the page's system data
- * @param {(changes: object) => Promise} save
+ * @param {object} config
+ * @param {{input: Map, property: Map}} config.values           values to show instead of the file's own
+ * @param {(kind, name, value) => void} config.onChange         value is null for "reset"
+ * @param {(kind, name) => void} config.onFire
+ * @param {boolean} [config.live=false]                         report every slider step, hide reset
+ * @param {{list: object[], onChange: (name, binding) => void}} [config.bindings]
  */
-export function renderStateEditor(container, player, system, save) {
+export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings }) {
   const { inputs, properties } = describe(player);
   container.replaceChildren();
   if (!inputs.length && !properties.length) {
     container.append(hint(game.i18n.localize("FOUNDRY_RIVE.NoState")));
     return;
   }
+  const boundBy = new Map((bindings?.list ?? []).map(b => [b.name, b]));
 
-  const stored = list => new Map(list.map(e => [e.name, e.value]));
-  const savedInputs = stored(system.inputs);
-  const savedProps = stored(system.properties);
-  const bindings = new Map(system.bindings.map(b => [b.name, b]));
-
-  /** Replaces or removes one `{name, value}` entry in a stored list. */
-  const writeEntry = (key, list, name, value) => {
-    const next = list.filter(e => e.name !== name);
-    if (value !== null) next.push({ name, value: String(value) });
-    return save({ [`system.${key}`]: next });
-  };
-
-  if (inputs.length) {
-    container.append(heading("FOUNDRY_RIVE.Inputs"));
-    for (const input of inputs) {
-      const current = savedInputs.has(input.name) ? savedInputs.get(input.name) : input.value;
-      const control = input.type === "trigger"
-        ? fireButton(() => fireInput(player, input.name))
-        : valueControl(input.type, current, null, value => writeEntry("inputs", system.inputs, input.name, value));
-      container.append(row(input.name, input.type, control, savedInputs.has(input.name) && input.type !== "trigger"
-        ? () => writeEntry("inputs", system.inputs, input.name, null) : null));
-    }
-  }
-
-  if (properties.length) {
-    container.append(heading("FOUNDRY_RIVE.Properties"));
-    for (const prop of properties) {
-      if (prop.type === "trigger") {
-        container.append(row(prop.name, prop.type, fireButton(() => setProperty(player, prop.name, true)), null));
+  const section = (kind, heading, items) => {
+    if (!items.length) return;
+    container.append(headingEl(heading));
+    for (const item of items) {
+      if (item.type === "trigger") {
+        container.append(row(item.name, item.type, fireButton(() => onFire(kind, item.name)), null));
         continue;
       }
-      const current = savedProps.has(prop.name) ? savedProps.get(prop.name) : prop.value;
-      const control = valueControl(prop.type, current, prop.options, value => writeEntry("properties", system.properties, prop.name, value));
-      container.append(row(prop.name, prop.type, control, savedProps.has(prop.name)
-        ? () => writeEntry("properties", system.properties, prop.name, null) : null));
-      container.append(bindingRow(prop.name, bindings.get(prop.name), binding => {
-        const next = system.bindings.filter(b => b.name !== prop.name);
-        if (binding.uuid || binding.path) next.push({ name: prop.name, ...binding });
-        return save({ "system.bindings": next });
-      }));
+      const overridden = values[kind].has(item.name);
+      const current = overridden ? values[kind].get(item.name) : item.value;
+      const control = valueControl(item.type, current, item.options, live, value => onChange(kind, item.name, value));
+      const reset = !live && overridden ? () => onChange(kind, item.name, null) : null;
+      container.append(row(item.name, item.type, control, reset));
+      if (bindings && kind === "property") {
+        container.append(bindingRow(boundBy.get(item.name), binding => bindings.onChange(item.name, binding)));
+      }
     }
-  }
+  };
+  section("input", "FOUNDRY_RIVE.Inputs", inputs);
+  section("property", "FOUNDRY_RIVE.Properties", properties);
 }
 
-function valueControl(type, value, options, onChange) {
+function valueControl(type, value, options, live, onChange) {
+  // Live controls report as they move; saved controls only on commit.
+  const on = (el, read) => el.addEventListener(live ? "input" : "change", () => onChange(read()));
   let el;
   switch (type) {
     case "number":
       el = Object.assign(document.createElement("input"), { type: "number", step: "any", value: value ?? "" });
-      el.addEventListener("change", () => onChange(el.value === "" ? null : el.value));
-      break;
+      if (live) {
+        // A slider is easier to drive live; keep the number box beside it for exact values.
+        const range = Object.assign(document.createElement("input"), { type: "range", min: 0, max: 100, step: "any", value: value ?? 0 });
+        const widen = n => { if (n > Number(range.max)) range.max = String(Math.ceil(n)); if (n < Number(range.min)) range.min = String(Math.floor(n)); };
+        widen(Number(value) || 0);
+        range.addEventListener("input", () => { el.value = range.value; onChange(range.value); });
+        el.addEventListener("input", () => { if (el.value === "") return; widen(Number(el.value)); range.value = el.value; onChange(el.value); });
+        const wrap = document.createElement("div");
+        wrap.className = "rive-number";
+        wrap.append(range, el);
+        return wrap;
+      }
+      on(el, () => (el.value === "" ? null : el.value));
+      return el;
     case "boolean":
       el = Object.assign(document.createElement("input"), { type: "checkbox", checked: value === true || value === "true" });
       el.addEventListener("change", () => onChange(el.checked));
-      break;
+      return el;
     case "color":
       el = Object.assign(document.createElement("input"), { type: "color", value: /^#[\da-f]{6}$/i.test(value) ? value : "#000000" });
-      el.addEventListener("change", () => onChange(el.value));
-      break;
+      on(el, () => el.value);
+      return el;
     case "enum":
       el = document.createElement("select");
       el.append(...(options ?? []).map(o => new Option(o, o, false, o === value)));
       el.addEventListener("change", () => onChange(el.value));
-      break;
+      return el;
     default:
       el = Object.assign(document.createElement("input"), { type: "text", value: value ?? "" });
-      el.addEventListener("change", () => onChange(el.value));
+      on(el, () => el.value);
+      return el;
   }
-  return el;
 }
 
-function bindingRow(name, binding, onChange) {
+function bindingRow(binding, onChange) {
   const uuid = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.uuid ?? "",
@@ -157,7 +156,7 @@ function fireButton(onFire) {
   return button;
 }
 
-function heading(key) {
+function headingEl(key) {
   const h = document.createElement("h3");
   h.className = "rive-state-heading";
   h.textContent = game.i18n.localize(key);

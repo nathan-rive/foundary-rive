@@ -13,6 +13,7 @@
   "scripts": ["lib/rive.js"],
   "esmodules": ["scripts/main.mjs"],
   "styles": ["styles/rive.css"],
+  "socket": true,
   "languages": [
     { "lang": "en", "name": "English", "path": "lang/en.json" }
   ],

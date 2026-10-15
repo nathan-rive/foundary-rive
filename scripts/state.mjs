@@ -40,16 +40,16 @@ function describeProperty(vm, { name, type }) {
 
 /** Applies stored `[{name, value}]` entries to the playing state machine's inputs. */
 export function applyInputs(player, entries = []) {
-  const rive = player.rive;
-  const sm = rive?.playingStateMachineNames?.[0];
-  if (!sm) return;
-  const inputs = new Map((rive.stateMachineInputs(sm) ?? []).map(i => [i.name, i]));
-  for (const { name, value } of entries) {
-    const input = inputs.get(name);
-    if (!input) continue;
-    if (INPUT_TYPES[input.type] === "number") setIfFinite(input, Number(value));
-    else if (INPUT_TYPES[input.type] === "boolean") input.value = toBoolean(value);
-  }
+  for (const { name, value } of entries) setInput(player, name, value);
+}
+
+/** Sets one number or boolean input on the playing state machine. */
+export function setInput(player, name, value) {
+  const sm = player.rive?.playingStateMachineNames?.[0];
+  const input = sm ? player.rive.stateMachineInputs(sm)?.find(i => i.name === name) : null;
+  if (!input) return;
+  if (INPUT_TYPES[input.type] === "number") setIfFinite(input, Number(value));
+  else if (INPUT_TYPES[input.type] === "boolean") input.value = toBoolean(value);
 }
 
 /** Fires a trigger input by name. */

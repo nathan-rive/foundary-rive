@@ -5,6 +5,7 @@ import * as wrapper from "./riv-wrapper.mjs";
 import { RivePageModel } from "./journal/rive-page-model.mjs";
 import { RivePageSheet } from "./journal/rive-page-sheet.mjs";
 import { activateEmbeds, registerEnricher } from "./enricher.mjs";
+import * as sync from "./sync.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -23,6 +24,7 @@ Hooks.once("init", () => {
     label: "FOUNDRY_RIVE.PageType"
   });
   registerEnricher();
+  sync.registerSocket();
 
   game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE };
 });

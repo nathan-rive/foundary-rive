@@ -3,7 +3,8 @@ import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
 import { fitStage, initialRatio } from "../stage.mjs";
-import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
+import { applyInputs, applyProperties, bindProperties, fireInput, setProperty } from "../state.mjs";
+import * as sync from "../sync.mjs";
 import { renderStateEditor } from "./state-editor.mjs";
 
 /**
@@ -33,6 +34,7 @@ export class RivePageSheet extends JournalPageSheet {
     data.fits = FITS;
     data.alignments = ALIGNMENTS;
     data.canUpload = game.user.can("FILES_UPLOAD");
+    data.isGM = game.user.isGM;
     return data;
   }
 
@@ -64,15 +66,72 @@ export class RivePageSheet extends JournalPageSheet {
       applyInputs(player, system.inputs);
       applyProperties(player, system.properties);
       player.onDestroy(bindProperties(player, system.bindings));
+      sync.track(this.document.uuid, player);
       if (this.isEditable) {
         this.#fillChoices(html, player.contents);
         const container = html.find(".rive-state")[0];
-        if (container) renderStateEditor(container, player, system, changes => this.document.update(changes));
+        if (container) this.#renderDefaultsEditor(container, player);
+      } else if (game.user.isGM) {
+        const container = html.find(".rive-live-controls")[0];
+        if (container) this.#renderLivePanel(container, html, player);
       }
     } catch (err) {
       console.error(`${MODULE_ID} |`, err);
       if (status) status.textContent = game.i18n.format("FOUNDRY_RIVE.LoadFailed", { error: err.message });
     }
+  }
+
+  /** Edit sheet: values chosen here are saved on the page as its defaults. */
+  #renderDefaultsEditor(container, player) {
+    const system = this.document.system;
+    const listKey = kind => (kind === "input" ? "inputs" : "properties");
+    renderStateEditor(container, player, {
+      values: {
+        input: new Map(system.inputs.map(e => [e.name, e.value])),
+        property: new Map(system.properties.map(e => [e.name, e.value]))
+      },
+      onChange: (kind, name, value) => {
+        const next = system[listKey(kind)].filter(e => e.name !== name);
+        if (value !== null) next.push({ name, value: String(value) });
+        return this.document.update({ [`system.${listKey(kind)}`]: next });
+      },
+      // Firing in the editor only previews; triggers aren't stored.
+      onFire: (kind, name) => (kind === "input" ? fireInput(player, name) : setProperty(player, name, true)),
+      bindings: {
+        list: system.bindings,
+        onChange: (name, binding) => {
+          const next = system.bindings.filter(b => b.name !== name);
+          if (binding.uuid || binding.path) next.push({ name, ...binding });
+          return this.document.update({ "system.bindings": next });
+        }
+      }
+    });
+  }
+
+  /** Journal view, GM only: drive the animation live for every client viewing this page. */
+  #renderLivePanel(container, html, player) {
+    const target = this.document.uuid;
+    const system = this.document.system;
+    const known = sync.knownValues(target);
+    const stored = (list, map) => { for (const e of list) if (!map.has(e.name)) map.set(e.name, e.value); return map; };
+    renderStateEditor(container, player, {
+      values: { input: stored(system.inputs, known.input), property: stored(system.properties, known.property) },
+      onChange: (kind, name, value) => sync.set(target, kind, name, value),
+      onFire: (kind, name) => sync.fire(target, kind, name),
+      live: true
+    });
+    html.find(".rive-live-save").on("click", () => this.#saveLiveAsDefaults());
+  }
+
+  /** Writes the current live values onto the page, so they apply on every load. */
+  async #saveLiveAsDefaults() {
+    const { inputs, properties } = sync.liveValues(this.document.uuid);
+    const merge = (stored, fresh) => [...stored.filter(e => !fresh.some(f => f.name === e.name)), ...fresh];
+    await this.document.update({
+      "system.inputs": merge(this.document.system.inputs, inputs),
+      "system.properties": merge(this.document.system.properties, properties)
+    });
+    ui.notifications.info(game.i18n.localize("FOUNDRY_RIVE.LiveSaved"));
   }
 
   /** Artboard and state machine dropdowns list what the loaded file contains. */

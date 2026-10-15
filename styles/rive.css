@@ -48,3 +48,30 @@
 .rive-state button.rive-reset {
   flex: 0 0 28px;
 }
+
+.rive-live {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed var(--color-border-light-primary, #b5b3a4);
+  border-radius: 4px;
+}
+
+.rive-live summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.rive-number {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: 1;
+}
+
+.rive-number input[type="range"] {
+  flex: 2;
+}
+
+.rive-number input[type="number"] {
+  flex: 1;
+}
