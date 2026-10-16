@@ -49,6 +49,10 @@ Open a tile's configuration and use the **Rive** tab to choose a Rive file, artb
 
 As GM, the tile's HUD has a Rive button that opens live controls: changes play on the tile for everyone viewing the scene, and **Save current values as defaults** stores them on the tile.
 
+## Rive on tokens
+
+Tokens work the same way: the token configuration (for a placed token, or an actor's prototype token) has a **Rive** tab, and the token HUD has the GM's live controls. A binding can use **@actor** instead of a UUID to mean the token's own actor, linked or unlinked, so a prototype token can bind, for example, `@actor` + `system.attributes.hp.value` and every token placed from it follows its own actor. Tokens with a dynamic token ring don't show Rive yet; turn the ring off to use Rive on that token.
+
 Two client settings help on slower machines: **Rive tile frame rate** (full, 30 or 15 fps) and **Maximum Rive players**.
 
 ## Known limitations

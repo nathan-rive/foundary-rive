@@ -3,17 +3,35 @@ import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { FITS } from "../journal/rive-page-model.mjs";
 import { renderDefaultsEditor } from "../live-controls.mjs";
-import { riveState } from "./rive-tiles.mjs";
+import { hasDynamicRing, riveState } from "./rive-canvas.mjs";
 
 /**
- * Adds a "Rive" tab to the v12 (AppV1) Tile config sheet. Its file, artboard,
- * state machine and fit inputs are named `flags.foundry-rive.*`, so the sheet's
- * own submit saves them. Default values and bindings are edited against a hidden
- * preview player and saved straight to the tile's flags.
+ * Adds a "Rive" tab to the v12 (AppV1) Tile and Token config sheets (including a
+ * prototype token's). Its file, artboard, state machine and fit inputs are named
+ * `flags.foundry-rive.*`, so the sheet's own submit saves them. Default values and
+ * bindings are edited against a hidden preview player and saved straight to the
+ * document's flags (a prototype token's through its actor).
  */
-export function registerTileConfig() {
-  Hooks.on("renderTileConfig", (app, html) => injectTab(app, html[0] ?? html));
-  Hooks.on("closeTileConfig", app => releasePreview(app.id));
+export function registerRiveConfig() {
+  for (const sheet of ["TileConfig", "TokenConfig"]) {
+    Hooks.on(`render${sheet}`, (app, html) => injectTab(app, html[0] ?? html));
+    Hooks.on(`close${sheet}`, app => releasePreview(app.id));
+  }
+}
+
+/** True for a token config editing an actor's prototype token rather than a placed token. */
+function isPrototype(app) {
+  return Boolean(app.isPrototype ?? app.object?.constructor?.name === "PrototypeToken");
+}
+
+/** Saves `{inputs?, properties?, bindings?}` lists onto the sheet's document flags. */
+function saveFlags(app, changes) {
+  const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`flags.${MODULE_ID}.${key}`, list]));
+  if (isPrototype(app)) {
+    const actor = app.object.parent ?? app.object.actor;
+    return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])));
+  }
+  return app.document.update(update);
 }
 
 /** Config app id -> hidden player used to list the file's contents and edit defaults. */
@@ -25,11 +43,14 @@ function releasePreview(appId) {
 }
 
 function injectTab(app, root) {
-  const nav = root.querySelector("nav.sheet-tabs, nav.tabs");
-  const lastTab = [...root.querySelectorAll(".tab[data-tab]")].at(-1);
+  // Token config has several tab groups (main, light, vision); join the main one.
+  const nav = root.querySelector('nav.sheet-tabs[data-group="main"]') ?? root.querySelector("nav.sheet-tabs, nav.tabs");
+  const group = nav?.dataset.group;
+  const lastTab = [...root.querySelectorAll(group ? `.tab[data-group="${group}"]` : ".tab[data-tab]")].at(-1);
   if (!nav || !lastTab || root.querySelector('.tab[data-tab="rive"]')) return;
 
-  const flags = app.document.flags?.[MODULE_ID] ?? {};
+  const isToken = app.object?.documentName === "Token" || isPrototype(app);
+  const flags = app.object.flags?.[MODULE_ID] ?? {};
   const i18n = key => game.i18n.localize(`FOUNDRY_RIVE.${key}`);
   const esc = value => foundry.utils.escapeHTML?.(String(value ?? "")) ?? String(value ?? "").replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
   const fitOptions = Object.entries(FITS)
@@ -45,8 +66,10 @@ function injectTab(app, root) {
   const tab = document.createElement("div");
   tab.className = "tab";
   tab.dataset.tab = "rive";
+  if (group) tab.dataset.group = group;
   tab.innerHTML = `
-    <p class="notes">${i18n("TileHint")}</p>
+    <p class="notes">${i18n(isToken ? "TokenHint" : "TileHint")}</p>
+    ${isToken && hasDynamicRing(app.object) ? `<p class="notification warning">${i18n("TokenRingWarning")}</p>` : ""}
     <div class="form-group">
       <label>${i18n("Source")}</label>
       <div class="form-fields">
@@ -114,7 +137,8 @@ function injectTab(app, root) {
   if (srcInput.value) suggest();
 
   // AppV1 tabs bind by delegation, so the new tab works; restore it if it was open.
-  if (app._tabs?.[0]?.active === "rive") app._tabs[0].activate("rive");
+  const tabs = app._tabs?.find(t => !group || t._navSelector?.includes(`"${group}"`)) ?? app._tabs?.[0];
+  if (tabs?.active === "rive") tabs.activate("rive");
   app.setPosition({ height: "auto" });
 }
 
@@ -132,7 +156,7 @@ async function loadPreview(app, src, tab, status) {
   sms.replaceChildren();
   stateSection.replaceChildren();
   if (!src) return;
-  const flags = app.document.flags?.[MODULE_ID] ?? {};
+  const flags = app.object.flags?.[MODULE_ID] ?? {};
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 1;
   let player;
@@ -162,9 +186,6 @@ async function loadPreview(app, src, tab, status) {
   heading.textContent = game.i18n.localize("FOUNDRY_RIVE.TileDefaults");
   const body = document.createElement("div");
   stateSection.append(heading, body);
-  renderDefaultsEditor(body, player, riveState(app.document), changes => {
-    const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`flags.${MODULE_ID}.${key}`, list]));
-    return app.document.update(update);
-  });
+  renderDefaultsEditor(body, player, riveState(app.object), changes => saveFlags(app, changes));
   app.setPosition({ height: "auto" });
 }

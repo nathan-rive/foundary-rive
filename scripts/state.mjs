@@ -82,22 +82,25 @@ export function applyProperties(player, entries = []) {
  * @param {object} [options]
  * @param {boolean} [options.applyNow=true]  set the current values immediately (applyInitialState
  *   passes false and sequences them itself)
+ * @param {{actor?: Actor}} [options.context]  what `@actor` means (a token's own actor)
  * @returns {() => void} stops listening
  */
-export function bindProperties(player, bindings = [], { applyNow = true } = {}) {
+export function bindProperties(player, bindings = [], { applyNow = true, context } = {}) {
   const stops = [];
   for (const { name, uuid, path } of bindings) {
     if (!name || !uuid || !path) continue;
-    const doc = fromUuidSync(uuid);
+    const doc = resolveBinding(uuid, context);
     if (!doc) {
       console.warn(`foundry-rive | binding for "${name}": no document ${uuid}`);
       continue;
     }
+    // A token's unlinked actor is a synthetic document with its own UUID; match on that.
+    const docUuid = doc.uuid;
     let last = foundry.utils.getProperty(doc, path);
     if (applyNow) setProperty(player, name, last);
     const hook = `update${doc.documentName}`;
     const id = Hooks.on(hook, updated => {
-      if (updated.uuid !== uuid) return;
+      if (updated.uuid !== docUuid) return;
       const value = foundry.utils.getProperty(updated, path);
       if (value === last) return;
       last = value;
@@ -106,6 +109,15 @@ export function bindProperties(player, bindings = [], { applyNow = true } = {}) 
     stops.push(() => Hooks.off(hook, id));
   }
   return () => stops.forEach(stop => stop());
+}
+
+/** Shorthand a binding can use instead of a UUID: the token's own actor. */
+export const ACTOR_SHORTHAND = "@actor";
+
+/** The document a binding reads: `@actor` resolves through `context`, anything else as a UUID. */
+export function resolveBinding(uuid, context) {
+  if (uuid === ACTOR_SHORTHAND) return context?.actor ?? null;
+  return fromUuidSync(uuid);
 }
 
 /**
@@ -128,8 +140,9 @@ export function bindProperties(player, bindings = [], { applyNow = true } = {}) 
  * @param {object[]} [state.properties]  stored {name, value}
  * @param {object[]} [state.bindings]    {name, uuid, path}
  * @param {(target: string) => {input: Map, property: Map}} [state.liveValues]
+ * @param {{actor?: Actor}} [state.context]  what `@actor` means in bindings
  */
-export async function applyInitialState(player, { target, inputs = [], properties = [], bindings = [], liveValues }) {
+export async function applyInitialState(player, { target, inputs = [], properties = [], bindings = [], liveValues, context }) {
   const stored = {
     input: new Map(inputs.map(e => [e.name, e.value])),
     property: new Map(properties.map(e => [e.name, e.value]))
@@ -140,7 +153,7 @@ export async function applyInitialState(player, { target, inputs = [], propertie
     if (live?.has(name)) return { value: live.get(name) };
     if (kind === "property" && bound.has(name)) {
       const { uuid, path } = bound.get(name);
-      const doc = fromUuidSync(uuid);
+      const doc = resolveBinding(uuid, context);
       if (doc) return { value: foundry.utils.getProperty(doc, path) };
     }
     if (stored[kind].has(name)) return { value: stored[kind].get(name) };

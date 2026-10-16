@@ -6,9 +6,9 @@ import { RivePageModel } from "./journal/rive-page-model.mjs";
 import { RivePageSheet } from "./journal/rive-page-sheet.mjs";
 import { activateEmbeds, registerEnricher } from "./enricher.mjs";
 import * as sync from "./sync.mjs";
-import * as tiles from "./canvas/rive-tiles.mjs";
-import { registerTileConfig } from "./canvas/tile-config.mjs";
-import { registerTileHud } from "./canvas/tile-hud.mjs";
+import * as riveCanvas from "./canvas/rive-canvas.mjs";
+import { registerRiveConfig } from "./canvas/rive-config.mjs";
+import { registerRiveHud } from "./canvas/rive-hud.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -29,11 +29,12 @@ Hooks.once("init", () => {
   registerEnricher();
   sync.registerSocket();
   registerSettings();
-  tiles.registerTiles();
-  registerTileConfig();
-  registerTileHud();
+  riveCanvas.registerCanvas();
+  registerRiveConfig();
+  registerRiveHud();
 
-  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE, tiles };
+  // `tiles` is kept as an alias of `canvas` for scripts written against v0.5/v0.6.
+  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE, canvas: riveCanvas, tiles: riveCanvas };
 });
 
 Hooks.once("ready", () => {
@@ -69,9 +70,9 @@ function registerSettings() {
       15: "FOUNDRY_RIVE.Settings.TileFps.15"
     },
     default: 0,
-    onChange: value => tiles.setTileFps(value)
+    onChange: value => riveCanvas.setTileFps(value)
   });
-  tiles.setTileFps(game.settings.get(MODULE_ID, "tileFps"));
+  riveCanvas.setTileFps(game.settings.get(MODULE_ID, "tileFps"));
   game.settings.register(MODULE_ID, "maxPlayers", {
     name: "FOUNDRY_RIVE.Settings.MaxPlayers.Name",
     hint: "FOUNDRY_RIVE.Settings.MaxPlayers.Hint",

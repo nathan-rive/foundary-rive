@@ -1,0 +1,271 @@
+import { MODULE_ID } from "../constants.mjs";
+import { RivePlayer } from "../rive-player.mjs";
+import { applyInitialState, bindProperties } from "../state.mjs";
+import * as sync from "../sync.mjs";
+
+/**
+ * Rive on scene Tiles and Tokens.
+ *
+ * A tile or token whose `flags.foundry-rive.src` is set gets a Rive player drawing
+ * into its own canvas, which becomes the placeable mesh's PIXI texture. The
+ * normal image stays underneath as the fallback (clients without the module,
+ * frames before load), and the shared ticker re-uploads each texture after Rive
+ * draws.
+ *
+ * Findings from the Phase 5 spike that shape this:
+ * - The runtime only draws into canvases laid out in the page, so source canvases
+ *   live in a hidden host element at full size, opacity 0.
+ * - It exposes no "pixels changed" signal (Draw never fires; Advance fires every
+ *   frame while playing), so a playing placeable uploads every frame. Cost is held
+ *   down by suspending ones that are off-screen or hidden, and by an optional fps cap.
+ * - A v12 tile without an image gets no mesh, so a Rive tile with no image is given
+ *   a transparent one (see FALLBACK_IMAGE). Tokens always get a mesh.
+ * - Tokens with a dynamic token ring draw their subject through the ring shader;
+ *   v1 leaves those tokens alone (see hasDynamicRing).
+ */
+
+/** Shipped 1 px transparent image for Rive tiles that have no image of their own. */
+export const FALLBACK_IMAGE = `modules/${MODULE_ID}/assets/transparent.png`;
+
+/** Longest side of a source canvas, in pixels. Bounds per-placeable cost. */
+const MAX_TEXTURE_SIDE = 512;
+
+/** How often to re-check which placeables are on screen. */
+const VISIBILITY_INTERVAL_MS = 250;
+
+/** The placeable types that can carry Rive, and the document changes that need a reload. */
+const KINDS = {
+  Tile: { reloadKeys: ["width", "height"] },
+  Token: { reloadKeys: ["width", "height", "ring"] }
+};
+
+/** Placeable -> bridge. Keyed by object, not id: a drag preview shares its original's id. */
+const bridges = new Map();
+
+/** Upload counter, for checking that suspended placeables stop uploading. */
+export const stats = { uploads: 0 };
+
+/** The Rive settings stored on a tile or token document, or null if it has none. */
+export function riveFlags(doc) {
+  const flags = doc?.flags?.[MODULE_ID];
+  if (!flags?.src) return null;
+  return {
+    src: flags.src,
+    artboard: flags.artboard || undefined,
+    stateMachine: flags.stateMachine || undefined,
+    fit: flags.fit || "contain"
+  };
+}
+
+/** Stored defaults and bindings on a tile or token document, in the same shape as Rive pages. */
+export function riveState(doc) {
+  const flags = doc?.flags?.[MODULE_ID] ?? {};
+  const list = value => (Array.isArray(value) ? value : []);
+  return { inputs: list(flags.inputs), properties: list(flags.properties), bindings: list(flags.bindings) };
+}
+
+/** v1 doesn't draw Rive on tokens with a dynamic token ring. */
+export function hasDynamicRing(doc) {
+  return (doc?.documentName === "Token" || doc?.constructor?.name === "PrototypeToken") && Boolean(doc.ring?.enabled);
+}
+
+/** The player drawing a placeable, if it has loaded. */
+export function playerFor(placeable) {
+  return bridges.get(placeable)?.player ?? null;
+}
+
+/** What `@actor` in a binding means for this placeable: a token's own actor (linked or not). */
+export function bindingContext(placeable) {
+  if (placeable?.document?.documentName !== "Token") return {};
+  return { actor: placeable.actor ?? placeable.document.actor ?? null };
+}
+
+export function registerCanvas() {
+  for (const [kind, { reloadKeys }] of Object.entries(KINDS)) {
+    // Drag previews draw a clone of their original's texture, which shares our
+    // source, so they animate without a player of their own.
+    Hooks.on(`draw${kind}`, placeable => {
+      if (!placeable.isPreview) attach(placeable);
+    });
+    Hooks.on(`destroy${kind}`, placeable => detach(placeable));
+    Hooks.on(`refresh${kind}`, placeable => {
+      // Keep our texture on the mesh if a refresh restored the image.
+      const bridge = bridges.get(placeable);
+      if (bridge?.texture && placeable.mesh && placeable.mesh.texture !== bridge.texture) placeable.mesh.texture = bridge.texture;
+    });
+    Hooks.on(`update${kind}`, (doc, changes) => {
+      const placeable = doc.object;
+      if (!placeable || placeable.isPreview) return;
+      const flagChanges = foundry.utils.getProperty(changes, `flags.${MODULE_ID}`) ?? {};
+      const reload = ["src", "artboard", "stateMachine", "fit"].some(k => k in flagChanges)
+        || Object.keys(flagChanges).some(k => k.startsWith("-="))
+        || `-=${MODULE_ID}` in (changes.flags ?? {})
+        || reloadKeys.some(k => k in changes);
+      if (reload) return attach(placeable);
+      // Only defaults or bindings changed: re-apply them without reloading the file.
+      if (["inputs", "properties", "bindings"].some(k => k in flagChanges)) applyState(placeable);
+    });
+  }
+  Hooks.on("preCreateTile", doc => {
+    if (riveFlags(doc) && !doc.texture.src) doc.updateSource({ "texture.src": FALLBACK_IMAGE });
+  });
+  Hooks.on("preUpdateTile", (doc, changes) => {
+    const merged = foundry.utils.mergeObject(doc.toObject(), changes, { inplace: false });
+    if (riveFlags(merged) && !merged.texture?.src) foundry.utils.setProperty(changes, "texture.src", FALLBACK_IMAGE);
+  });
+  Hooks.on("canvasTearDown", () => [...bridges.keys()].forEach(detach));
+  Hooks.on("canvasReady", () => {
+    canvas.app.ticker.remove(tick);
+    canvas.app.ticker.add(tick, null, PIXI.UPDATE_PRIORITY.HIGH);
+  });
+}
+
+/** Pixel size of a placeable: tokens size by the grid (getSize), tiles are in pixels. */
+function pixelSize(placeable) {
+  if (typeof placeable.getSize === "function") return placeable.getSize();
+  return { width: placeable.document.width, height: placeable.document.height };
+}
+
+async function attach(placeable) {
+  detach(placeable);
+  const doc = placeable.document;
+  const settings = riveFlags(doc);
+  if (!settings || !placeable.mesh || hasDynamicRing(doc)) return;
+
+  const { width, height } = pixelSize(placeable);
+  const scale = Math.min(1, MAX_TEXTURE_SIDE / Math.max(width, height));
+  const source = document.createElement("canvas");
+  source.width = Math.max(1, Math.round(width * scale));
+  source.height = Math.max(1, Math.round(height * scale));
+  Object.assign(source.style, {
+    position: "fixed", left: "0px", top: "0px",
+    width: `${source.width}px`, height: `${source.height}px`,
+    opacity: "0", pointerEvents: "none", zIndex: "-1"
+  });
+  host().append(source);
+
+  const bridge = { player: null, texture: null, source, dirty: false, lastUpload: 0, suspended: false, stop: null };
+  bridges.set(placeable, bridge);
+
+  let player;
+  try {
+    player = await RivePlayer.mount(source, { ...settings, offscreen: true });
+  } catch (err) {
+    console.error(`${MODULE_ID} | ${doc.documentName} ${placeable.id}:`, err);
+    if (bridges.get(placeable) === bridge) bridges.delete(placeable);
+    source.remove();
+    return;
+  }
+  // Redrawn, re-attached or deleted while we loaded.
+  if (bridges.get(placeable) !== bridge || placeable.destroyed || !placeable.mesh) {
+    source.remove();
+    return player.destroy();
+  }
+
+  bridge.player = player;
+  bridge.texture = PIXI.Texture.from(source);
+  const markDirty = () => (bridge.dirty = true);
+  player.rive.on(globalThis.rive.EventType.Advance, markDirty);
+  bridge.stop = () => player.rive?.off(globalThis.rive.EventType.Advance, markDirty);
+
+  player.onDestroy(() => bridge.unbind?.());
+  sync.track(doc.uuid, player, { applyNow: false });
+  applyState(placeable);
+
+  placeable.texture = bridge.texture;
+  placeable.mesh.texture = bridge.texture;
+  placeable.renderFlags.set({ refreshMesh: true });
+}
+
+/**
+ * Starting values (live GM value, else bound data, else stored default), applied
+ * the same way on every client (see applyInitialState); bindings then follow
+ * later document changes.
+ */
+function applyState(placeable) {
+  const bridge = bridges.get(placeable);
+  if (!bridge?.player) return;
+  const doc = placeable.document;
+  const state = riveState(doc);
+  const context = bindingContext(placeable);
+  bridge.unbind?.();
+  bridge.unbind = bindProperties(bridge.player, state.bindings, { applyNow: false, context });
+  applyInitialState(bridge.player, { target: doc.uuid, ...state, context, liveValues: sync.knownValues });
+}
+
+function detach(placeable) {
+  const bridge = bridges.get(placeable);
+  if (!bridge) return;
+  bridges.delete(placeable);
+  bridge.stop?.();
+  bridge.player?.destroy();
+  bridge.texture?.destroy(true);
+  bridge.source.remove();
+}
+
+/* -------------------------------------------- */
+/*  Per-frame work                              */
+/* -------------------------------------------- */
+
+let lastVisibilityCheck = 0;
+
+/** Upload rate cap from the "tileFps" client setting; 0 = every frame. */
+let tileFps = 0;
+export function setTileFps(fps) {
+  tileFps = Number(fps) || 0;
+}
+
+function tick() {
+  const now = performance.now();
+  if (now - lastVisibilityCheck >= VISIBILITY_INTERVAL_MS) {
+    lastVisibilityCheck = now;
+    updateVisibility();
+  }
+  const minInterval = tileFps > 0 ? 1000 / tileFps - 1 : 0;
+  for (const bridge of bridges.values()) {
+    if (!bridge.dirty || !bridge.texture || bridge.suspended) continue;
+    if (now - bridge.lastUpload < minInterval) continue;
+    bridge.dirty = false;
+    bridge.lastUpload = now;
+    bridge.texture.baseTexture.update();
+    stats.uploads++;
+  }
+}
+
+/** Suspends players whose placeable is hidden from this user or entirely off screen. */
+function updateVisibility() {
+  const screen = canvas.app.renderer.screen;
+  for (const [placeable, bridge] of bridges) {
+    if (!bridge.player || !placeable.mesh) continue;
+    let visible = placeable.visible && placeable.mesh.visible && placeable.mesh.worldAlpha > 0;
+    if (visible) {
+      const b = placeable.mesh.getBounds();
+      visible = b.right > screen.left && b.left < screen.right && b.bottom > screen.top && b.top < screen.bottom;
+    }
+    if (visible === !bridge.suspended) continue;
+    bridge.suspended = !visible;
+    bridge.player.suspend(bridge.suspended);
+  }
+}
+
+function host() {
+  let el = document.getElementById(`${MODULE_ID}-tile-sources`);
+  if (!el) {
+    el = document.createElement("div");
+    el.id = `${MODULE_ID}-tile-sources`;
+    el.setAttribute("aria-hidden", "true");
+    document.body.append(el);
+  }
+  return el;
+}
+
+/** Live bridges, for diagnostics: [{kind, id, suspended, playing}]. */
+export function describeBridges() {
+  return [...bridges].map(([p, b]) => ({
+    kind: p.document.documentName,
+    id: p.id,
+    tileId: p.id,
+    suspended: b.suspended,
+    playing: b.player?.rive?.isPlaying ?? false
+  }));
+}
