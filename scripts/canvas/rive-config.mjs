@@ -4,6 +4,7 @@ import { uploadRiv } from "../riv-wrapper.mjs";
 import { FITS } from "../journal/rive-page-model.mjs";
 import { renderDefaultsEditor } from "../live-controls.mjs";
 import { hasDynamicRing, riveState } from "./rive-canvas.mjs";
+import { findTabSlot } from "./tab-slot.mjs";
 
 /**
  * Adds a "Rive" tab to the v12 (AppV1) Tile and Token config sheets (including a
@@ -57,17 +58,14 @@ function releasePreview(appId) {
 }
 
 function injectTab(app, root) {
-  // Token config has several tab groups (main, light, vision); join the main one.
-  // Other modules nest their own tabs inside a tab (Monk's Active Tile Triggers
-  // does in Triggers), so only top-level tabs count: one that isn't inside a nav's
-  // tab and isn't inside another tab.
-  const nav = root.querySelector('nav.sheet-tabs[data-group="main"]')
-    ?? [...root.querySelectorAll("nav.sheet-tabs, nav.tabs")].find(n => !n.closest(".tab"));
-  const group = nav?.dataset.group;
-  const lastTab = [...root.querySelectorAll(group ? `.tab[data-group="${group}"]` : ".tab[data-tab]")]
-    .filter(tab => !tab.parentElement.closest(".tab"))
-    .at(-1);
-  if (!nav || !lastTab || root.querySelector('.tab[data-tab="rive"]')) return;
+  if (root.querySelector('.tab[data-tab="rive"]')) return;
+  // Join the sheet's main tab bar, wherever other modules have added tabs (see tab-slot.mjs).
+  const slot = findTabSlot(root, app._tabs);
+  if (!slot) {
+    console.warn(`${MODULE_ID} | No place for the Rive tab in ${app.constructor.name}; another module may have changed its tabs.`);
+    return;
+  }
+  const { nav, group, after: lastTab, controller } = slot;
 
   const isToken = app.object?.documentName === "Token" || isPrototype(app);
   const flags = app.object.flags?.[MODULE_ID] ?? {};
@@ -163,8 +161,7 @@ function injectTab(app, root) {
     if (item) riveTabOpen.set(app.id, item.dataset.tab === "rive");
   });
   if (riveTabOpen.get(app.id)) {
-    const tabs = app._tabs?.find(t => { try { return nav.matches(t._navSelector); } catch { return false; } }) ?? app._tabs?.[0];
-    tabs?.activate("rive");
+    (controller ?? app._tabs?.[0])?.activate("rive");
   }
   app.setPosition({ height: "auto" });
 }

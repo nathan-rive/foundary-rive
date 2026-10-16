@@ -7,7 +7,7 @@ Rive for Foundry (module id `foundry-rive`, repo `nathan-rive/foundary-rive`) is
 Do all four steps before every commit, with no exceptions. If any step fails, fix it or stop and tell the user. Never commit around a failure.
 
 1. **Version:** builds are produced by the release workflow from the release tag; never hand-edit the `version`, `manifest` or `download` fields in `module.json`. Pick the tag by the rules in **Releases** below.
-2. **Tests:** `node tests/run.mjs` (Node 20+). Every check must pass. Add tests for new behaviour, and especially for anything that writes to the world. If Node isn't installed on the machine, push the branch and wait for the **Tests** workflow to pass instead; never release with it failing.
+2. **Tests:** `npm install --no-save --no-package-lock linkedom@0.18.12` once (a test-only DOM), then `node tests/run.mjs` (Node 20+). Every check must pass. Add tests for new behaviour, and especially for anything that writes to the world. If Node isn't installed on the machine, push the branch and wait for the **Tests** workflow to pass instead; never release with it failing.
 3. **Audit:** `python tools/audit.py` (`py tools/audit.py` on Windows). It lists every line that can change world data, files on the server or other clients' state, and marks new or changed ones as `NEW`.
    - Review **each** `NEW` site against the checklist below, reading the surrounding code rather than just the one line.
    - Only when every site passes, record the review with `python tools/audit.py --accept`, and commit `tools/audit-reviewed.txt` with the change.
@@ -70,7 +70,7 @@ Check every write site, and the code that reaches it, against these rules:
 | `.github/workflows/release.yml` | Builds `module.zip` (vendoring the pinned `@rive-app/canvas`), stamps `module.json`, updates the channel; runs the tests and audit first. |
 | `.github/workflows/tests.yml` | Runs the tests and the audit on every push. |
 | `tools/audit.py`, `tools/audit-reviewed.txt` | The world-safety audit and its reviewed baseline. |
-| `tests/` | Node test suites. `node tests/run.mjs` runs them all. |
+| `tests/` | Node test suites. `node tests/run.mjs` runs them all (the config-sheet layout tests need linkedom; see step 2 above). |
 | `riv_samples/`, `bug-reports/` | Sample `.riv` files and runtime bug write-ups; don't commit changes to them unless the user asks. |
 
 ## Conventions
