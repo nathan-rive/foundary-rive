@@ -273,6 +273,8 @@ async function attach(placeable) {
   sync.track(doc.uuid, player, { applyNow: false });
   applyState(placeable);
 
+  // Keep what Foundry drew with, to hand back before our texture is destroyed.
+  bridge.original = { texture: placeable.texture, meshTexture: placeable.mesh.texture };
   placeable.texture = bridge.texture;
   placeable.mesh.texture = bridge.texture;
   placeable.renderFlags.set({ refreshMesh: true });
@@ -300,8 +302,29 @@ function detach(placeable) {
   bridges.delete(placeable);
   bridge.stop?.();
   bridge.player?.destroy();
+  restoreTextures(placeable, bridge);
   bridge.texture?.destroy(true);
   bridge.source.remove();
+}
+
+/**
+ * Points the placeable and its mesh back at Foundry's own texture, so nothing
+ * holds ours once it's destroyed. Foundry reads a tile's texture while tearing
+ * the canvas down (TilesLayer#_tearDown checks `isVideo`), which runs after our
+ * canvasTearDown hook: a destroyed texture there throws, aborts the layer's
+ * tear-down and leaves the Tiles layer unclickable until a reload.
+ */
+export function restoreTextures(placeable, bridge) {
+  if (!bridge?.texture) return;
+  const usable = texture => Boolean(texture) && texture !== bridge.texture && !texture.destroyed
+    && Boolean(texture.baseTexture) && !texture.baseTexture.destroyed;
+  if (placeable.texture === bridge.texture) {
+    placeable.texture = usable(bridge.original?.texture) ? bridge.original.texture : null;
+  }
+  const mesh = placeable.mesh;
+  if (mesh && !mesh.destroyed && mesh.texture === bridge.texture) {
+    mesh.texture = usable(bridge.original?.meshTexture) ? bridge.original.meshTexture : PIXI.Texture.EMPTY;
+  }
 }
 
 /* -------------------------------------------- */
