@@ -6,6 +6,8 @@ import { RivePageModel } from "./journal/rive-page-model.mjs";
 import { RivePageSheet } from "./journal/rive-page-sheet.mjs";
 import { activateEmbeds, registerEnricher } from "./enricher.mjs";
 import * as sync from "./sync.mjs";
+import * as tiles from "./canvas/rive-tiles.mjs";
+import { registerTileConfig } from "./canvas/tile-config.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -25,8 +27,11 @@ Hooks.once("init", () => {
   });
   registerEnricher();
   sync.registerSocket();
+  registerSettings();
+  tiles.registerTiles();
+  registerTileConfig();
 
-  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE };
+  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE, tiles };
 });
 
 Hooks.once("ready", () => {
@@ -47,6 +52,36 @@ Hooks.once("ready", () => {
   }).observe(document.body, { childList: true, subtree: true });
   activateEmbeds();
 });
+
+/** Per-client performance settings. */
+function registerSettings() {
+  game.settings.register(MODULE_ID, "tileFps", {
+    name: "FOUNDRY_RIVE.Settings.TileFps.Name",
+    hint: "FOUNDRY_RIVE.Settings.TileFps.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    choices: {
+      0: "FOUNDRY_RIVE.Settings.TileFps.Full",
+      30: "FOUNDRY_RIVE.Settings.TileFps.30",
+      15: "FOUNDRY_RIVE.Settings.TileFps.15"
+    },
+    default: 0,
+    onChange: value => tiles.setTileFps(value)
+  });
+  tiles.setTileFps(game.settings.get(MODULE_ID, "tileFps"));
+  game.settings.register(MODULE_ID, "maxPlayers", {
+    name: "FOUNDRY_RIVE.Settings.MaxPlayers.Name",
+    hint: "FOUNDRY_RIVE.Settings.MaxPlayers.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 8, max: 128, step: 8 },
+    default: RivePlayer.maxLive,
+    onChange: value => (RivePlayer.maxLive = value)
+  });
+  RivePlayer.maxLive = game.settings.get(MODULE_ID, "maxPlayers");
+}
 
 /** Phase 0 gate: a hard-coded .riv playing in a plain dialog. */
 export function openTestDialog({ src = SAMPLE_RIV, stateMachine } = {}) {

@@ -21,6 +21,22 @@
     "Properties": "View Model Properties",
     "NoState": "This file's state machine has no inputs, and it has no view model properties.",
     "Fire": "Fire",
+    "TileTab": "Rive",
+    "TileHint": "Play a Rive animation on this tile. The tile's image stays underneath as a fallback for anyone without the module.",
+    "TileSourceHint": "An uploaded .riv.json file or a URL to a .riv file. Leave empty to turn Rive off for this tile.",
+    "Settings": {
+      "TileFps": {
+        "Name": "Rive tile frame rate",
+        "Hint": "How often animated Rive tiles and tokens update on this computer. Lower it if scenes with many Rive tiles feel slow.",
+        "Full": "Full (match the canvas)",
+        "30": "30 fps",
+        "15": "15 fps"
+      },
+      "MaxPlayers": {
+        "Name": "Maximum Rive players",
+        "Hint": "How many Rive animations can play at once on this computer, across journals, chat, tiles and tokens. Beyond this, new ones show an error instead of loading."
+      }
+    },
     "LiveControls": "Live controls",
     "LiveHint": "Changes here play for everyone viewing this page right now. They aren't saved unless you save them as defaults.",
     "LiveSave": "Save current values as defaults",

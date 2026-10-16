@@ -9,6 +9,9 @@ export class RivePlayer {
   /** Every live player, so leaks show up as a growing count. */
   static live = new Set();
 
+  /** Cap on live players; a client setting can change it. */
+  static maxLive = MAX_LIVE_PLAYERS;
+
   /**
    * Backstop for adapters that miss a teardown: destroys players whose canvas
    * was in the page when it loaded and has since been removed.
@@ -47,8 +50,8 @@ export class RivePlayer {
    * @returns {Promise<RivePlayer>} resolves once the file has loaded
    */
   static mount(canvas, options) {
-    if (RivePlayer.live.size >= MAX_LIVE_PLAYERS) {
-      return Promise.reject(new Error(`Rive: live player cap (${MAX_LIVE_PLAYERS}) reached`));
+    if (RivePlayer.live.size >= RivePlayer.maxLive) {
+      return Promise.reject(new Error(`Rive: live player cap (${RivePlayer.maxLive}) reached`));
     }
     const player = new RivePlayer();
     RivePlayer.live.add(player);
@@ -85,7 +88,7 @@ export class RivePlayer {
     return this.#rive?.contents ?? null;
   }
 
-  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true }) {
+  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true, offscreen = false }) {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
@@ -120,9 +123,13 @@ export class RivePlayer {
               this.#rebindAfterLoad = true;
             }
           }
-          this.#rive.resizeDrawingSurfaceToCanvas();
-          this.#wasConnected = canvas.isConnected;
-          this.#observe();
+          // A canvas managed elsewhere (a scene texture source) keeps the size it was
+          // given and gets no DOM observers; its owner decides when it plays.
+          if (!offscreen) {
+            this.#rive.resizeDrawingSurfaceToCanvas();
+            this.#wasConnected = canvas.isConnected;
+            this.#observe();
+          }
           resolve(this);
         },
         onLoadError: e => reject(new Error(`Rive: failed to load ${src ?? "buffer"}: ${e?.data ?? e}`))
@@ -151,6 +158,13 @@ export class RivePlayer {
   pause() {
     this.#wantsPlay = false;
     this.#rive?.pause();
+  }
+
+  /** Stops drawing without forgetting whether it should play (e.g. scrolled out of view). */
+  suspend(suspended) {
+    if (!this.#rive) return;
+    if (suspended) this.#rive.pause();
+    else if (this.#wantsPlay) this.#rive.play();
   }
 
   /** Frees the native Rive objects. Safe to call more than once. */

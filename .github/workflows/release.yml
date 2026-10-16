@@ -61,7 +61,7 @@ jobs:
           mv module.stamped.json module.json
 
       - name: Zip
-        run: zip -r module.zip module.json scripts templates styles lang lib README.md LICENSE
+        run: zip -r module.zip module.json scripts templates styles lang assets lib README.md LICENSE
 
       - name: Attach to the release
         env:
