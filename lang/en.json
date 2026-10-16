@@ -59,7 +59,8 @@
       "fitWidth": "Fit width",
       "fitHeight": "Fit height",
       "scaleDown": "Scale down",
-      "none": "None"
+      "none": "None",
+      "layout": "Layout (resize the artboard)"
     },
     "Alignment": {
       "top-left": "Top left",
@@ -97,6 +98,7 @@
       "Variable": "Save as",
       "VariableHelp": "Name to store the value under (default: the Rive name). Later actions read it as rive.<name>, for example Check value with rive.sprung, or {{value.rive.sprung}}. Compare text in quotes (\"Open\"); for true/false, check true and use the fail landing for false.",
       "GetText": "<span class=\"action-style\">Get Rive</span> <span class=\"details-style\">{name}</span> from <span class=\"entity-style\">{entity}</span> as <span class=\"value-style\">{variable}</span>"
-    }
+    },
+    "ScriptsRefused": "This file's script(s) {names} didn't run: Rive only runs signed scripts on the web. Export or publish the file signed from Rive; until then, whatever they draw or drive won't show."
   }
 }

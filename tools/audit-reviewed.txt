@@ -38,6 +38,8 @@ acef1e15d799  scripts/canvas/rive-config.mjs  [world: file upload / folder]  src
 f968b15897ba  scripts/canvas/rive-hud.mjs  [client: sheet / HUD render hook]  Hooks.on(`render${hud}`, (app, html) => addButton(app, html[0] ?? html));
 e81c1f505e75  scripts/canvas/rive-hud.mjs  [world: document update]  await doc.update({
 fb3d441a6103  scripts/canvas/rive-hud.mjs  [world: document delete]  windows.delete(uuid);
+fcb09c428da5  scripts/dev/health-check.mjs  [client: core patch]  console.error = capture;
+614dbe34c688  scripts/dev/health-check.mjs  [client: core patch]  if (console.error === capture) console.error = original;
 0b7cec482ee8  scripts/enricher.mjs  [client: destroy]  if (!canvas.isConnected) return player.destroy();
 dfb053543599  scripts/integrations/matt.mjs  [world: document update]  await doc.update({ [`flags.${MODULE_ID}.${key}`]: next });
 3dd6a199e6f6  scripts/journal/rive-page-sheet.mjs  [client: destroy]  if (!canvas.isConnected) return player.destroy();
@@ -55,6 +57,8 @@ b466b410f20d  scripts/riv-wrapper.mjs  [world: file upload / folder]  await File
 e246ee9a3f48  scripts/rive-player.mjs  [client: destroy]  if (player.#wasConnected && !player.#canvas?.isConnected) player.destroy();
 72b05c8bf6b8  scripts/rive-player.mjs  [client: destroy]  player.destroy();
 06b11fd5a1d1  scripts/rive-player.mjs  [world: document delete]  RivePlayer.live.delete(this);
+78f76fbcb98a  scripts/runtime-log.mjs  [client: core patch]  console.error = tee;
+655d2ba49f74  scripts/runtime-log.mjs  [client: core patch]  if (console.error === tee) console.error = original;
 244eaf238a24  scripts/spikes.mjs  [world: network fetch]  const res = await fetch(foundry.utils.getRoute(WASM_PATH), { method: "HEAD" });
 a48882f6d1c3  scripts/spikes.mjs  [world: network fetch]  const bytes = await (await fetch(src)).blob();
 29ae847117bd  scripts/spikes.mjs  [world: file upload / folder]  result.path = await uploadRiv(file, { dir });

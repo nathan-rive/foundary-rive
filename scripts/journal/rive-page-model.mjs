@@ -5,7 +5,8 @@ export const FITS = {
   fitWidth: "FOUNDRY_RIVE.Fit.fitWidth",
   fitHeight: "FOUNDRY_RIVE.Fit.fitHeight",
   scaleDown: "FOUNDRY_RIVE.Fit.scaleDown",
-  none: "FOUNDRY_RIVE.Fit.none"
+  none: "FOUNDRY_RIVE.Fit.none",
+  layout: "FOUNDRY_RIVE.Fit.layout"
 };
 
 export const ALIGNMENTS = {

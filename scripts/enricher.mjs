@@ -2,6 +2,7 @@ import { MODULE_ID } from "./constants.mjs";
 import { RivePlayer } from "./rive-player.mjs";
 import { ALIGNMENTS, FITS } from "./journal/rive-page-model.mjs";
 import { AUTO, fitStage, initialRatio, isAspectRatio } from "./stage.mjs";
+import { refusedScriptsText } from "./notices.mjs";
 
 /**
  * Inline embeds in any enriched text (journal text pages, chat, item descriptions):
@@ -94,6 +95,7 @@ async function mountEmbed(figure) {
     const player = await RivePlayer.mount(canvas, { ...options, src: figure.dataset.riveSrc });
     if (!canvas.isConnected) return player.destroy();
     fitStage(figure.querySelector(".rive-stage"), player, options.aspectRatio);
+    if (status) status.textContent = refusedScriptsText(player);
   } catch (err) {
     console.error(`${MODULE_ID} |`, err);
     if (status) status.textContent = game.i18n.format("FOUNDRY_RIVE.LoadFailed", { error: err.message });
