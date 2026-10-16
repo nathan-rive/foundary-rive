@@ -85,7 +85,7 @@ export class RivePlayer {
     return this.#rive?.contents ?? null;
   }
 
-  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true }) {
+  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true, offscreen = false }) {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
@@ -120,9 +120,13 @@ export class RivePlayer {
               this.#rebindAfterLoad = true;
             }
           }
-          this.#rive.resizeDrawingSurfaceToCanvas();
-          this.#wasConnected = canvas.isConnected;
-          this.#observe();
+          // An offscreen canvas (e.g. the source of a scene texture) has no CSS size and is
+          // never "visible", so it keeps the size it was given and skips the DOM observers.
+          if (!offscreen) {
+            this.#rive.resizeDrawingSurfaceToCanvas();
+            this.#wasConnected = canvas.isConnected;
+            this.#observe();
+          }
           resolve(this);
         },
         onLoadError: e => reject(new Error(`Rive: failed to load ${src ?? "buffer"}: ${e?.data ?? e}`))
