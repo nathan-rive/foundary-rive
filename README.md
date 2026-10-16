@@ -69,6 +69,8 @@ The path field suggests a `status:` entry for each condition. Bindings follow co
 
 Bind each value to a Rive view model property of the matching type: **number** for counts and scores, **boolean** for `status:` paths and yes/no fields, **string** for text. Paths are case-sensitive.
 
+A **color** property accepts text too: a CSS color name (`blue`, `goldenrod`, `Light Blue`, `dark-red` — case, spaces and hyphens don't matter), `transparent`, or hex (`#3a7bd5`, `#fff`, `#ff000080`). So binding a character's bio eye or hair color works as long as it's written as a color name or hex; other words (such as "auburn") are ignored and the color stays as it was. An **enum** property only takes text that exactly matches one of its options.
+
 **Any system: the token itself (document `@token`)**
 
 | Path | Type | What it is |
@@ -107,6 +109,11 @@ Bind each value to a Rive view model property of the matching type: **number** f
 | `system.resources.primary.value` | number | First tracked resource (also `secondary`, `tertiary`) |
 | `system.spells.spell1.value` | number | Remaining 1st-level spell slots (`spell2` … `spell9`) |
 | `system.currency.gp` | number | Gold pieces (also `cp`, `sp`, `ep`, `pp`) |
+| `system.details.eyes` | string (or color) | Eyes, from the character's bio |
+| `system.details.hair` | string (or color) | Hair, from the bio |
+| `system.details.skin` | string (or color) | Skin, from the bio |
+| `system.details.gender`, `system.details.age`, `system.details.height`, `system.details.weight`, `system.details.faith` | string | Other bio details |
+| `system.details.appearance`, `system.details.trait` | string | Appearance and personality text |
 
 Conditions (`status:<id>`, boolean): `blinded`, `charmed`, `deafened`, `exhaustion`, `frightened`, `grappled`, `incapacitated`, `invisible`, `paralyzed`, `petrified`, `poisoned`, `prone`, `restrained`, `stunned`, `unconscious`, plus `bleeding`, `burning`, `cursed`, `diseased`, `silenced`, `surprised`, `transformed`. Other dnd5e states are also statuses: `dead`, `concentrating`, `dodging`, `hiding`, `flying`, `hovering`, `burrowing`, `ethereal`, `sleeping`, `stable`, `marked`, and cover (`coverHalf`, `coverThreeQuarters`, `coverTotal`).
 

@@ -5,6 +5,8 @@
  * one schema covers every type and a changed file never fails validation.
  */
 
+import { parseColor } from "./colors.mjs";
+
 const INPUT_TYPES = { 56: "number", 58: "trigger", 59: "boolean" };
 
 /** Property types we can show and store. Others (lists, images, nested models) are skipped. */
@@ -66,7 +68,8 @@ export function setProperty(player, name, value) {
     case "number": return setIfFinite(vm.number(name), Number(value));
     case "string": { const p = vm.string(name); if (p) p.value = String(value ?? ""); return; }
     case "boolean": { const p = vm.boolean(name); if (p) p.value = toBoolean(value); return; }
-    case "color": { const p = vm.color(name); const argb = hexToArgb(value); if (p && argb !== null) p.value = argb; return; }
+    // Hex or a CSS color name, so bound text such as a character's eye color works.
+    case "color": { const p = vm.color(name); const argb = parseColor(String(value ?? "")); if (p && argb !== null) p.value = argb; return; }
     case "enumType": { const p = vm.enum(name); if (p?.values?.includes(String(value))) p.value = String(value); return; }
     case "trigger": if (toBoolean(value)) vm.trigger(name)?.trigger(); return;
   }
@@ -275,12 +278,4 @@ function toBoolean(value) {
 function argbToHex(argb) {
   if (typeof argb !== "number") return "#000000";
   return `#${(argb & 0xffffff).toString(16).padStart(6, "0")}`;
-}
-
-/** "#rrggbb" or "#rrggbbaa" -> ARGB as a signed 32-bit int (opaque unless alpha given). */
-function hexToArgb(hex) {
-  const m = /^#?([\da-f]{6})([\da-f]{2})?$/i.exec(String(hex ?? ""));
-  if (!m) return null;
-  const alpha = m[2] ? parseInt(m[2], 16) : 0xff;
-  return (alpha << 24) | parseInt(m[1], 16);
 }
