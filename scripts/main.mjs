@@ -9,6 +9,7 @@ import * as sync from "./sync.mjs";
 import * as riveCanvas from "./canvas/rive-canvas.mjs";
 import { registerRiveConfig } from "./canvas/rive-config.mjs";
 import { registerRiveHud } from "./canvas/rive-hud.mjs";
+import { healthCheck } from "./dev/health-check.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -34,7 +35,7 @@ Hooks.once("init", () => {
   registerRiveHud();
 
   // `tiles` is kept as an alias of `canvas` for scripts written against v0.5/v0.6.
-  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE, canvas: riveCanvas, tiles: riveCanvas };
+  game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, healthCheck, PAGE_TYPE, canvas: riveCanvas, tiles: riveCanvas };
 });
 
 Hooks.once("ready", () => {
