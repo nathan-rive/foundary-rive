@@ -43,6 +43,20 @@ Write `@Rive[...]` anywhere Foundry enriches text: journal text pages, chat mess
 
 Quote values that contain spaces.
 
+## Rive on scene tiles
+
+Open a tile's configuration and use the **Rive** tab to choose a Rive file, artboard, state machine and fit. The tile's own image stays underneath as a fallback; a tile with no image gets a transparent one so Foundry still draws it. Below the file settings you can set default values for the file's inputs and view model properties, and bind properties to Foundry data (drop a document on the UUID field, then give a data path such as `system.attributes.hp.value`).
+
+As GM, the tile's HUD has a Rive button that opens live controls: changes play on the tile for everyone viewing the scene, and **Save current values as defaults** stores them on the tile.
+
+Two client settings help on slower machines: **Rive tile frame rate** (full, 30 or 15 fps) and **Maximum Rive players**.
+
+## Known limitations
+
+- **Live sync shares values, not animation history.** Journal pages and tiles sync the *current* values of inputs and view model properties. A Rive state machine can also react to the *order* values changed in (for example a transition that fires whenever a number changes). A client that joins later only receives the final values, so with that kind of logic its animation can settle in a different state from the GM's. Every client applies starting values the same way (one per frame, in the file's own order: live value, else bound data, else stored default), so clients that load fresh agree with each other; a GM who watched a series of live edits may still differ. For files driven by synced values, make the visuals depend on the current values (for example transitions with `bool == true` / `bool == false` conditions) and keep triggers and change-fired transitions for momentary effects.
+- **Rive runtime 2.44.2: feather direction changes aren't redrawn until the shape's geometry changes.** When a data-bound value switches a fill's feathering between inner and outer, the shape keeps rendering the old way (or not at all) until something changes its geometry, such as a corner radius. This happens with both the Canvas2D and WebGL2 web runtimes; the Rive editor is unaffected. Because it depends on what changed last, it can also make two clients with identical values look different. Workaround in the file: change the shape's geometry (even by a tiny amount) whenever the feather direction changes.
+- **Foundry v12 only for now.** The release channel above is for v12; newer Foundry versions are planned through the same codebase.
+
 ## Developer tools
 
 - `game.modules.get("foundry-rive").api.openTestDialog()` plays a sample `.riv` in a dialog.

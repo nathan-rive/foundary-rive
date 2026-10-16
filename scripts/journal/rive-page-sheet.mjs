@@ -3,7 +3,7 @@ import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
 import { fitStage, initialRatio } from "../stage.mjs";
-import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
+import { applyInitialState, bindProperties } from "../state.mjs";
 import * as sync from "../sync.mjs";
 import { mountLiveControls, renderDefaultsEditor, withLiveValues } from "../live-controls.mjs";
 
@@ -63,10 +63,11 @@ export class RivePageSheet extends JournalPageSheet {
       this.#player = player;
       const system = this.document.system;
       fitStage(canvas.closest(".rive-stage"), player, system.aspectRatio);
-      applyInputs(player, system.inputs);
-      applyProperties(player, system.properties);
-      player.onDestroy(bindProperties(player, system.bindings));
-      sync.track(this.document.uuid, player);
+      // Bindings follow later document changes; starting values are sequenced the
+      // same way on every client (see applyInitialState).
+      player.onDestroy(bindProperties(player, system.bindings, { applyNow: false }));
+      sync.track(this.document.uuid, player, { applyNow: false });
+      applyInitialState(player, { target: this.document.uuid, ...system, liveValues: sync.knownValues });
       if (this.isEditable) {
         this.#fillChoices(html, player.contents);
         const container = html.find(".rive-state")[0];

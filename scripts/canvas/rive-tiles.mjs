@@ -1,6 +1,6 @@
 import { MODULE_ID } from "../constants.mjs";
 import { RivePlayer } from "../rive-player.mjs";
-import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
+import { applyInitialState, bindProperties } from "../state.mjs";
 import * as sync from "../sync.mjs";
 
 /**
@@ -140,24 +140,26 @@ async function attach(tile) {
   bridge.stop = () => player.rive?.off(globalThis.rive.EventType.Advance, markDirty);
 
   player.onDestroy(() => bridge.unbind?.());
+  sync.track(tile.document.uuid, player, { applyNow: false });
   applyState(tile);
-  sync.track(tile.document.uuid, player);
 
   tile.texture = bridge.texture;
   tile.mesh.texture = bridge.texture;
   tile.renderFlags.set({ refreshMesh: true });
 }
 
-/** Stored defaults, then bindings to document data, then live GM values on top. */
+/**
+ * Starting values (live GM value, else bound data, else stored default), applied
+ * the same way on every client (see applyInitialState); bindings then follow
+ * later document changes.
+ */
 function applyState(tile) {
   const bridge = bridges.get(tile);
   if (!bridge?.player) return;
   const state = riveState(tile.document);
-  applyInputs(bridge.player, state.inputs);
-  applyProperties(bridge.player, state.properties);
   bridge.unbind?.();
-  bridge.unbind = bindProperties(bridge.player, state.bindings);
-  sync.applyKnown(tile.document.uuid, bridge.player);
+  bridge.unbind = bindProperties(bridge.player, state.bindings, { applyNow: false });
+  applyInitialState(bridge.player, { target: tile.document.uuid, ...state, liveValues: sync.knownValues });
 }
 
 function detach(tile) {

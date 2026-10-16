@@ -79,9 +79,12 @@ export function applyProperties(player, entries = []) {
 /**
  * Keeps view model properties in step with Foundry document data.
  * @param {Array<{name: string, uuid: string, path: string}>} bindings
+ * @param {object} [options]
+ * @param {boolean} [options.applyNow=true]  set the current values immediately (applyInitialState
+ *   passes false and sequences them itself)
  * @returns {() => void} stops listening
  */
-export function bindProperties(player, bindings = []) {
+export function bindProperties(player, bindings = [], { applyNow = true } = {}) {
   const stops = [];
   for (const { name, uuid, path } of bindings) {
     if (!name || !uuid || !path) continue;
@@ -91,7 +94,7 @@ export function bindProperties(player, bindings = []) {
       continue;
     }
     let last = foundry.utils.getProperty(doc, path);
-    setProperty(player, name, last);
+    if (applyNow) setProperty(player, name, last);
     const hook = `update${doc.documentName}`;
     const id = Hooks.on(hook, updated => {
       if (updated.uuid !== uuid) return;
@@ -103,6 +106,68 @@ export function bindProperties(player, bindings = []) {
     stops.push(() => Hooks.off(hook, id));
   }
   return () => stops.forEach(stop => stop());
+}
+
+/**
+ * Brings a freshly loaded player to its starting values the same way on every
+ * client: one value per frame, in the order the file lists its inputs and
+ * properties. Each value comes from the highest source that has one: live GM
+ * value (sync), then bound document data, then the stored default.
+ *
+ * Why: a Rive state machine can react to the order values change in, and
+ * several changes in one frame can behave differently from separate ones. So
+ * stacking every value into the first frame, in whatever order the sources
+ * happened to be read, could leave identical values looking different on
+ * different clients. Values are re-read at each step, so a live change that
+ * arrives mid-sequence is never overwritten by an older one.
+ *
+ * @param {RivePlayer} player
+ * @param {object} state
+ * @param {string} [state.target]        sync target (document UUID) for live values
+ * @param {object[]} [state.inputs]      stored {name, value}
+ * @param {object[]} [state.properties]  stored {name, value}
+ * @param {object[]} [state.bindings]    {name, uuid, path}
+ * @param {(target: string) => {input: Map, property: Map}} [state.liveValues]
+ */
+export async function applyInitialState(player, { target, inputs = [], properties = [], bindings = [], liveValues }) {
+  const stored = {
+    input: new Map(inputs.map(e => [e.name, e.value])),
+    property: new Map(properties.map(e => [e.name, e.value]))
+  };
+  const bound = new Map(bindings.filter(b => b.name && b.uuid && b.path).map(b => [b.name, b]));
+  const valueFor = (kind, name) => {
+    const live = target && liveValues ? liveValues(target)[kind] : null;
+    if (live?.has(name)) return { value: live.get(name) };
+    if (kind === "property" && bound.has(name)) {
+      const { uuid, path } = bound.get(name);
+      const doc = fromUuidSync(uuid);
+      if (doc) return { value: foundry.utils.getProperty(doc, path) };
+    }
+    if (stored[kind].has(name)) return { value: stored[kind].get(name) };
+    return null;
+  };
+
+  const { inputs: fileInputs, properties: fileProperties } = describe(player);
+  const steps = [
+    ...fileInputs.filter(i => i.type !== "trigger").map(i => ["input", i.name]),
+    ...fileProperties.filter(p => p.type !== "trigger").map(p => ["property", p.name])
+  ];
+  for (const [kind, name] of steps) {
+    if (!player.rive) return; // destroyed while sequencing
+    const source = valueFor(kind, name);
+    if (!source) continue;
+    if (kind === "input") setInput(player, name, source.value);
+    else setProperty(player, name, source.value);
+    await nextFrames(2);
+  }
+}
+
+/** Resolves after `n` animation frames, so Rive advances between changes. */
+function nextFrames(n) {
+  return new Promise(resolve => {
+    const step = left => (left ? requestAnimationFrame(() => step(left - 1)) : resolve());
+    step(n);
+  });
 }
 
 function setIfFinite(target, n) {

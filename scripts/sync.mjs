@@ -46,12 +46,12 @@ export function registerSocket() {
 }
 
 /** Makes `player` follow live changes to `target`, and asks the GMs for current values. */
-export function track(target, player) {
+export function track(target, player, { applyNow = true } = {}) {
   if (!target) return;
   if (!players.has(target)) players.set(target, new Set());
   players.get(target).add(player);
   player.onDestroy(() => players.get(target)?.delete(player));
-  applyKnown(target, player);
+  if (applyNow) applyKnown(target, player);
   emit({ type: "request", target });
 }
 
