@@ -64,6 +64,7 @@ Check every write site, and the code that reaches it, against these rules:
 | `scripts/enricher.mjs` | Inline `@Rive[...]` embeds. |
 | `scripts/stage.mjs` | Player sizing (aspect ratio). |
 | `scripts/canvas/` | Tiles and tokens: the texture bridge (`rive-canvas.mjs`), the config tab (`rive-config.mjs`) and HUD button (`rive-hud.mjs`). |
+| `scripts/integrations/` | Optional integrations with other modules, inert unless that module is active: Monk's Active Tile Triggers actions (`matt.mjs`). |
 | `scripts/spikes.mjs` | Developer checks callable from the console. |
 | `templates/`, `styles/`, `lang/`, `assets/` | Handlebars templates, CSS, localization and the transparent fallback image. |
 | `.github/workflows/release.yml` | Builds `module.zip` (vendoring the pinned `@rive-app/canvas`), stamps `module.json`, updates the channel; runs the tests and audit first. |

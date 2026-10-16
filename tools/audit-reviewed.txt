@@ -15,6 +15,7 @@ ca2078d68579  scripts/canvas/rive-config.mjs  [document delete]  previews.delete
 acef1e15d799  scripts/canvas/rive-config.mjs  [file upload / folder]  srcInput.value = await uploadRiv(file);
 e81c1f505e75  scripts/canvas/rive-hud.mjs  [document update]  await doc.update({
 fb3d441a6103  scripts/canvas/rive-hud.mjs  [document delete]  windows.delete(uuid);
+dfb053543599  scripts/integrations/matt.mjs  [document update]  await doc.update({ [`flags.${MODULE_ID}.${key}`]: next });
 b424f13f77ce  scripts/journal/rive-page-sheet.mjs  [document update]  return this.document.update(update);
 abe955ddb875  scripts/journal/rive-page-sheet.mjs  [document update]  await this.document.update({ "system.inputs": inputs, "system.properties": properties });
 e95e09f8243c  scripts/journal/rive-page-sheet.mjs  [file upload / folder]  const src = await uploadRiv(file);
