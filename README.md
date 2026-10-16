@@ -171,6 +171,7 @@ It never deletes documents or files, never changes permissions, and never edits 
 
 - `game.modules.get("foundry-rive").api.openTestDialog()` plays a sample `.riv` in a dialog.
 - `await game.modules.get("foundry-rive").api.spikes.all()` runs the WASM, upload, leak and scene-context checks.
+- `await game.modules.get("foundry-rive").api.healthCheck()` (GM, in a scene with Rive tiles and tokens) redraws the canvas twice and checks that tiles and tokens can still be clicked and selected, every Rive object is playing, config sheets show the Rive tab, and nothing logged an error. It changes nothing in the world. If tiles ever stop responding to clicks, run it and include its report with the bug.
 
 ## Rive files and uploads
 
