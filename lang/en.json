@@ -73,6 +73,8 @@
       "bottom-right": "Bottom right"
     },
     "BindActorShorthand": "This token's actor",
-    "BindTokenShorthand": "This token"
+    "BindTokenShorthand": "This token",
+    "LiveBoundHidden": "Bound values aren't shown here; they follow their data.",
+    "LiveAllBound": "Every value in this file is bound to data, so there's nothing to change live."
   }
 }

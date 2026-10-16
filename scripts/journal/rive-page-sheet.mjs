@@ -92,8 +92,8 @@ export class RivePageSheet extends JournalPageSheet {
 
   /** Journal view, GM only: drive the animation live for every client viewing this page. */
   #renderLivePanel(container, html, player) {
-    const { inputs, properties } = this.document.system;
-    mountLiveControls(container, player, { target: this.document.uuid, inputs, properties });
+    const { inputs, properties, bindings } = this.document.system;
+    mountLiveControls(container, player, { target: this.document.uuid, inputs, properties, bindings });
     html.find(".rive-live-save").on("click", () => this.#saveLiveAsDefaults());
   }
 

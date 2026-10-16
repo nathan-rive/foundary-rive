@@ -189,8 +189,9 @@ export function readBinding(doc, path) {
 /**
  * Brings a freshly loaded player to its starting values the same way on every
  * client: one value per frame, in the order the file lists its inputs and
- * properties. Each value comes from the highest source that has one: live GM
- * value (sync), then bound document data, then the stored default.
+ * properties. Each value comes from the highest source that has one: bound
+ * document data (bound properties only), then the live GM value (sync), then
+ * the stored default.
  *
  * Why: a Rive state machine can react to the order values change in, and
  * several changes in one frame can behave differently from separate ones. So
@@ -215,13 +216,14 @@ export async function applyInitialState(player, { target, inputs = [], propertie
   };
   const bound = new Map(bindings.filter(b => b.name && b.uuid && b.path).map(b => [b.name, b]));
   const valueFor = (kind, name) => {
-    const live = target && liveValues ? liveValues(target)[kind] : null;
-    if (live?.has(name)) return { value: live.get(name) };
+    // A bound property follows its data; live values only fill in if the document is gone.
     if (kind === "property" && bound.has(name)) {
       const { uuid, path } = bound.get(name);
       const doc = resolveBinding(uuid, context);
       if (doc) return { value: readBinding(doc, path) };
     }
+    const live = target && liveValues ? liveValues(target)[kind] : null;
+    if (live?.has(name)) return { value: live.get(name) };
     if (stored[kind].has(name)) return { value: stored[kind].get(name) };
     return null;
   };

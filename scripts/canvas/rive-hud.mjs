@@ -48,6 +48,7 @@ export function openLiveWindow(placeable) {
       title: game.i18n.format("FOUNDRY_RIVE.TileLiveTitle", { name }),
       content: `
         <p class="notes">${game.i18n.localize(isToken ? "FOUNDRY_RIVE.TokenLiveHint" : "FOUNDRY_RIVE.TileLiveHint")}</p>
+        <p class="notes rive-bound-note">${game.i18n.localize("FOUNDRY_RIVE.LiveBoundHidden")}</p>
         <div class="rive-live-controls"></div>
         <button type="button" class="rive-live-save"><i class="fa-solid fa-floppy-disk"></i> ${game.i18n.localize("FOUNDRY_RIVE.LiveSave")}</button>`,
       buttons: {},
@@ -55,7 +56,7 @@ export function openLiveWindow(placeable) {
         const root = html[0]?.closest(".app") ?? html[0];
         const container = root.querySelector(".rive-live-controls");
         const state = riveState(doc);
-        stop = mountLiveControls(container, player, { target: uuid, inputs: state.inputs, properties: state.properties });
+        stop = mountLiveControls(container, player, { target: uuid, inputs: state.inputs, properties: state.properties, bindings: state.bindings });
         root.querySelector(".rive-live-save").addEventListener("click", async () => {
           const merged = withLiveValues(uuid, riveState(doc));
           await doc.update({

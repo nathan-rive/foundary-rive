@@ -15,12 +15,16 @@ import { describe } from "../state.mjs";
  * @param {(kind, name) => void} config.onFire
  * @param {boolean} [config.live=false]                         report every slider step, hide reset
  * @param {{list: object[], onChange: (name, binding) => void}} [config.bindings]
+ * @param {Set<string>} [config.hiddenProperties]               property names not to show (e.g. bound ones, live)
  */
-export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings }) {
-  const { inputs, properties } = describe(player);
+export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings, hiddenProperties }) {
+  const described = describe(player);
+  const inputs = described.inputs;
+  const properties = described.properties.filter(p => !hiddenProperties?.has(p.name));
   container.replaceChildren();
   if (!inputs.length && !properties.length) {
-    container.append(hint(game.i18n.localize("FOUNDRY_RIVE.NoState")));
+    const allHidden = described.properties.length > 0;
+    container.append(hint(game.i18n.localize(allHidden ? "FOUNDRY_RIVE.LiveAllBound" : "FOUNDRY_RIVE.NoState")));
     return;
   }
   const boundBy = new Map((bindings?.list ?? []).map(b => [b.name, b]));
