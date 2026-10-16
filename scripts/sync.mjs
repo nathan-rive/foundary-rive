@@ -164,7 +164,8 @@ function serialize(target) {
   return { input: [...state.input], property: [...state.property] };
 }
 
-function applyKnown(target, player) {
+/** Re-applies the live values this client knows for `target` (e.g. after stored defaults were re-applied). */
+export function applyKnown(target, player) {
   const state = live.get(target);
   if (!state) return;
   for (const [name, entry] of state.input) apply(player, "input", name, entry.value);

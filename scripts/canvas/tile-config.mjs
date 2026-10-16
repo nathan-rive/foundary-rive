@@ -2,14 +2,26 @@ import { MODULE_ID } from "../constants.mjs";
 import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { FITS } from "../journal/rive-page-model.mjs";
+import { renderDefaultsEditor } from "../live-controls.mjs";
+import { riveState } from "./rive-tiles.mjs";
 
 /**
- * Adds a "Rive" tab to the v12 (AppV1) Tile config sheet. Its inputs are named
- * `flags.foundry-rive.*`, so the sheet's own submit saves them; nothing here
- * writes to the document except an upload.
+ * Adds a "Rive" tab to the v12 (AppV1) Tile config sheet. Its file, artboard,
+ * state machine and fit inputs are named `flags.foundry-rive.*`, so the sheet's
+ * own submit saves them. Default values and bindings are edited against a hidden
+ * preview player and saved straight to the tile's flags.
  */
 export function registerTileConfig() {
   Hooks.on("renderTileConfig", (app, html) => injectTab(app, html[0] ?? html));
+  Hooks.on("closeTileConfig", app => releasePreview(app.id));
+}
+
+/** Config app id -> hidden player used to list the file's contents and edit defaults. */
+const previews = new Map();
+
+function releasePreview(appId) {
+  previews.get(appId)?.destroy();
+  previews.delete(appId);
 }
 
 function injectTab(app, root) {
@@ -64,7 +76,8 @@ function injectTab(app, root) {
         <select name="flags.${MODULE_ID}.fit">${fitOptions}</select>
       </div>
     </div>
-    <p class="rive-status hint"></p>`;
+    <p class="rive-status hint"></p>
+    <section class="rive-state"></section>`;
   lastTab.after(tab);
 
   const srcInput = tab.querySelector(`input[name="flags.${MODULE_ID}.src"]`);
@@ -94,8 +107,9 @@ function injectTab(app, root) {
     }
   });
 
-  // Suggest the file's artboards and state machines once we know the file.
-  const suggest = () => fillSuggestions(srcInput.value, tab, app.id, status);
+  // Suggest the file's artboards and state machines once we know the file, and
+  // list its inputs and properties for defaults and bindings.
+  const suggest = () => loadPreview(app, srcInput.value, tab, status);
   srcInput.addEventListener("change", suggest);
   if (srcInput.value) suggest();
 
@@ -104,24 +118,53 @@ function injectTab(app, root) {
   app.setPosition({ height: "auto" });
 }
 
-/** Loads the file briefly in a hidden player to list its artboards and state machines. */
-async function fillSuggestions(src, tab, appId, status) {
-  const artboards = tab.querySelector(`#${CSS.escape(`${appId}-rive-artboards`)}`);
-  const sms = tab.querySelector(`#${CSS.escape(`${appId}-rive-sms`)}`);
+/**
+ * Loads the file in a hidden player (kept until the sheet closes or re-renders):
+ * fills the artboard and state machine suggestions, and builds the defaults and
+ * bindings editor from the inputs and properties the file offers.
+ */
+async function loadPreview(app, src, tab, status) {
+  releasePreview(app.id);
+  const artboards = tab.querySelector(`#${CSS.escape(`${app.id}-rive-artboards`)}`);
+  const sms = tab.querySelector(`#${CSS.escape(`${app.id}-rive-sms`)}`);
+  const stateSection = tab.querySelector(".rive-state");
   artboards.replaceChildren();
   sms.replaceChildren();
+  stateSection.replaceChildren();
   if (!src) return;
-  const probe = document.createElement("canvas");
-  probe.width = probe.height = 1;
+  const flags = app.document.flags?.[MODULE_ID] ?? {};
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  let player;
   try {
-    const player = await RivePlayer.mount(probe, { src, autoplay: false, offscreen: true });
-    const boards = player.contents?.artboards ?? [];
-    player.destroy();
-    artboards.append(...boards.map(a => new Option(a.name, a.name)));
-    const names = [...new Set(boards.flatMap(a => a.stateMachines.map(s => s.name)))];
-    sms.append(...names.map(n => new Option(n, n)));
-    status.textContent = "";
+    player = await RivePlayer.mount(canvas, {
+      src,
+      artboard: flags.artboard || undefined,
+      stateMachine: flags.stateMachine || undefined,
+      offscreen: true
+    });
   } catch (err) {
     status.textContent = game.i18n.format("FOUNDRY_RIVE.LoadFailed", { error: err.message });
+    return;
   }
+  // The sheet closed or re-rendered while we loaded.
+  if (!tab.isConnected) return player.destroy();
+  previews.set(app.id, player);
+  status.textContent = "";
+
+  const boards = player.contents?.artboards ?? [];
+  artboards.append(...boards.map(a => new Option(a.name, a.name)));
+  const names = [...new Set(boards.flatMap(a => a.stateMachines.map(s => s.name)))];
+  sms.append(...names.map(n => new Option(n, n)));
+
+  const heading = document.createElement("h3");
+  heading.className = "rive-state-heading";
+  heading.textContent = game.i18n.localize("FOUNDRY_RIVE.TileDefaults");
+  const body = document.createElement("div");
+  stateSection.append(heading, body);
+  renderDefaultsEditor(body, player, riveState(app.document), changes => {
+    const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`flags.${MODULE_ID}.${key}`, list]));
+    return app.document.update(update);
+  });
+  app.setPosition({ height: "auto" });
 }

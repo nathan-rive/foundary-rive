@@ -23,7 +23,10 @@
     "Fire": "Fire",
     "TileTab": "Rive",
     "TileHint": "Play a Rive animation on this tile. The tile's image stays underneath as a fallback for anyone without the module.",
-    "TileSourceHint": "An uploaded .riv.json file or a URL to a .riv file. Leave empty to turn Rive off for this tile.",
+    "TileDefaults": "Default values and bindings",
+    "TileNotLoaded": "This tile's Rive file hasn't loaded yet.",
+    "TileLiveTitle": "Rive live controls: {name}",
+    "TileSourceHint":"An uploaded .riv.json file or a URL to a .riv file. Leave empty to turn Rive off for this tile.",
     "Settings": {
       "TileFps": {
         "Name": "Rive tile frame rate",

@@ -8,6 +8,7 @@ import { activateEmbeds, registerEnricher } from "./enricher.mjs";
 import * as sync from "./sync.mjs";
 import * as tiles from "./canvas/rive-tiles.mjs";
 import { registerTileConfig } from "./canvas/tile-config.mjs";
+import { registerTileHud } from "./canvas/tile-hud.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
@@ -30,6 +31,7 @@ Hooks.once("init", () => {
   registerSettings();
   tiles.registerTiles();
   registerTileConfig();
+  registerTileHud();
 
   game.modules.get(MODULE_ID).api = { RivePlayer, spikes, wrapper, openTestDialog, PAGE_TYPE, tiles };
 });

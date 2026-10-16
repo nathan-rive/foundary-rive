@@ -1,5 +1,7 @@
 import { MODULE_ID } from "../constants.mjs";
 import { RivePlayer } from "../rive-player.mjs";
+import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
+import * as sync from "../sync.mjs";
 
 /**
  * Rive on scene Tiles.
@@ -46,6 +48,18 @@ export function riveFlags(doc) {
   };
 }
 
+/** Stored defaults and bindings on a tile document, in the same shape as Rive pages. */
+export function riveState(doc) {
+  const flags = doc?.flags?.[MODULE_ID] ?? {};
+  const list = value => (Array.isArray(value) ? value : []);
+  return { inputs: list(flags.inputs), properties: list(flags.properties), bindings: list(flags.bindings) };
+}
+
+/** The player drawing a tile, if it has loaded. */
+export function playerFor(tile) {
+  return bridges.get(tile)?.player ?? null;
+}
+
 export function registerTiles() {
   // Drag previews draw a clone of their original's texture, which shares our
   // source, so they animate without a player of their own.
@@ -59,9 +73,16 @@ export function registerTiles() {
     if (bridge?.texture && tile.mesh && tile.mesh.texture !== bridge.texture) tile.mesh.texture = bridge.texture;
   });
   Hooks.on("updateTile", (doc, changes) => {
-    if (!foundry.utils.hasProperty(changes, `flags.${MODULE_ID}`) && !("width" in changes) && !("height" in changes)) return;
     const tile = doc.object;
-    if (tile && !tile.isPreview) attach(tile);
+    if (!tile || tile.isPreview) return;
+    const flagChanges = foundry.utils.getProperty(changes, `flags.${MODULE_ID}`) ?? {};
+    const reload = ["src", "artboard", "stateMachine", "fit"].some(k => k in flagChanges)
+      || Object.keys(flagChanges).some(k => k.startsWith("-="))
+      || `-=${MODULE_ID}` in (changes.flags ?? {})
+      || "width" in changes || "height" in changes;
+    if (reload) return attach(tile);
+    // Only defaults or bindings changed: re-apply them without reloading the file.
+    if (["inputs", "properties", "bindings"].some(k => k in flagChanges)) applyState(tile);
   });
   Hooks.on("preCreateTile", doc => {
     if (riveFlags(doc) && !doc.texture.src) doc.updateSource({ "texture.src": FALLBACK_IMAGE });
@@ -118,9 +139,25 @@ async function attach(tile) {
   player.rive.on(globalThis.rive.EventType.Advance, markDirty);
   bridge.stop = () => player.rive?.off(globalThis.rive.EventType.Advance, markDirty);
 
+  player.onDestroy(() => bridge.unbind?.());
+  applyState(tile);
+  sync.track(tile.document.uuid, player);
+
   tile.texture = bridge.texture;
   tile.mesh.texture = bridge.texture;
   tile.renderFlags.set({ refreshMesh: true });
+}
+
+/** Stored defaults, then bindings to document data, then live GM values on top. */
+function applyState(tile) {
+  const bridge = bridges.get(tile);
+  if (!bridge?.player) return;
+  const state = riveState(tile.document);
+  applyInputs(bridge.player, state.inputs);
+  applyProperties(bridge.player, state.properties);
+  bridge.unbind?.();
+  bridge.unbind = bindProperties(bridge.player, state.bindings);
+  sync.applyKnown(tile.document.uuid, bridge.player);
 }
 
 function detach(tile) {

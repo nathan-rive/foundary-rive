@@ -3,9 +3,9 @@ import { RivePlayer } from "../rive-player.mjs";
 import { uploadRiv } from "../riv-wrapper.mjs";
 import { ALIGNMENTS, FITS } from "./rive-page-model.mjs";
 import { fitStage, initialRatio } from "../stage.mjs";
-import { applyInputs, applyProperties, bindProperties, fireInput, setProperty } from "../state.mjs";
+import { applyInputs, applyProperties, bindProperties } from "../state.mjs";
 import * as sync from "../sync.mjs";
-import { renderStateEditor, showValue } from "./state-editor.mjs";
+import { mountLiveControls, renderDefaultsEditor, withLiveValues } from "../live-controls.mjs";
 
 /**
  * v12 (AppV1) sheet for "foundry-rive.rive" pages. The journal sheet renders it
@@ -83,59 +83,23 @@ export class RivePageSheet extends JournalPageSheet {
 
   /** Edit sheet: values chosen here are saved on the page as its defaults. */
   #renderDefaultsEditor(container, player) {
-    const system = this.document.system;
-    const listKey = kind => (kind === "input" ? "inputs" : "properties");
-    renderStateEditor(container, player, {
-      values: {
-        input: new Map(system.inputs.map(e => [e.name, e.value])),
-        property: new Map(system.properties.map(e => [e.name, e.value]))
-      },
-      onChange: (kind, name, value) => {
-        const next = system[listKey(kind)].filter(e => e.name !== name);
-        if (value !== null) next.push({ name, value: String(value) });
-        return this.document.update({ [`system.${listKey(kind)}`]: next });
-      },
-      // Firing in the editor only previews; triggers aren't stored.
-      onFire: (kind, name) => (kind === "input" ? fireInput(player, name) : setProperty(player, name, true)),
-      bindings: {
-        list: system.bindings,
-        onChange: (name, binding) => {
-          const next = system.bindings.filter(b => b.name !== name);
-          if (binding.uuid || binding.path) next.push({ name, ...binding });
-          return this.document.update({ "system.bindings": next });
-        }
-      }
+    renderDefaultsEditor(container, player, this.document.system, changes => {
+      const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`system.${key}`, list]));
+      return this.document.update(update);
     });
   }
 
   /** Journal view, GM only: drive the animation live for every client viewing this page. */
   #renderLivePanel(container, html, player) {
-    const target = this.document.uuid;
-    const system = this.document.system;
-    const known = sync.knownValues(target);
-    const stored = (list, map) => { for (const e of list) if (!map.has(e.name)) map.set(e.name, e.value); return map; };
-    renderStateEditor(container, player, {
-      values: { input: stored(system.inputs, known.input), property: stored(system.properties, known.property) },
-      onChange: (kind, name, value) => sync.set(target, kind, name, value),
-      onFire: (kind, name) => sync.fire(target, kind, name),
-      live: true
-    });
-    // Keep this panel current when another GM changes a value.
-    const hookId = Hooks.on(sync.CHANGED_HOOK, (changed, kind, name, value) => {
-      if (changed === target) showValue(container, kind, name, value);
-    });
-    player.onDestroy(() => Hooks.off(sync.CHANGED_HOOK, hookId));
+    const { inputs, properties } = this.document.system;
+    mountLiveControls(container, player, { target: this.document.uuid, inputs, properties });
     html.find(".rive-live-save").on("click", () => this.#saveLiveAsDefaults());
   }
 
   /** Writes the current live values onto the page, so they apply on every load. */
   async #saveLiveAsDefaults() {
-    const { inputs, properties } = sync.liveValues(this.document.uuid);
-    const merge = (stored, fresh) => [...stored.filter(e => !fresh.some(f => f.name === e.name)), ...fresh];
-    await this.document.update({
-      "system.inputs": merge(this.document.system.inputs, inputs),
-      "system.properties": merge(this.document.system.properties, properties)
-    });
+    const { inputs, properties } = withLiveValues(this.document.uuid, this.document.system);
+    await this.document.update({ "system.inputs": inputs, "system.properties": properties });
     ui.notifications.info(game.i18n.localize("FOUNDRY_RIVE.LiveSaved"));
   }
 
