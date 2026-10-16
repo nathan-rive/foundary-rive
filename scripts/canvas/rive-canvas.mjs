@@ -83,10 +83,13 @@ export function playerFor(placeable) {
 /** What `@actor` in a binding means for this placeable: a token's own actor (linked or not). */
 export function bindingContext(placeable) {
   if (placeable?.document?.documentName !== "Token") return {};
-  // A getter: Foundry can replace a token's synthetic actor object, so resolve it each time.
+  // Getters: Foundry can replace a token's synthetic actor object, so resolve each time.
   return {
     get actor() {
       return placeable.document.actor ?? null;
+    },
+    get token() {
+      return placeable.document;
     }
   };
 }

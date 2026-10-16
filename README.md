@@ -53,6 +53,18 @@ As GM, the tile's HUD has a Rive button that opens live controls: changes play o
 
 Tokens work the same way: the token configuration (for a placed token, or an actor's prototype token) has a **Rive** tab, and the token HUD has the GM's live controls. A binding can use **@actor** instead of a UUID to mean the token's own actor, linked or unlinked, so a prototype token can bind, for example, `@actor` + `system.attributes.hp.value` and every token placed from it follows its own actor. Tokens with a dynamic token ring don't show Rive yet; turn the ring off to use Rive on that token.
 
+### Binding to conditions and token data
+
+A binding's path can be a data path or a condition:
+
+| Document | Path | Value |
+| --- | --- | --- |
+| `@actor`, or an actor/token UUID | `system.attributes.hp.value` (any data path) | That field's value |
+| `@actor`, `@token`, or an actor/token UUID | `status:prone` (any status id the world defines) | `true` while the condition applies, else `false`, for a boolean property |
+| `@token` | `hidden`, `elevation`, `disposition` (any token field) | That token field's value |
+
+The path field suggests a `status:` entry for each condition. Bindings follow condition changes (Active Effects added, changed or removed, including ones from items) as well as actor and token updates, and an unlinked token follows its base actor where it doesn't override it.
+
 Two client settings help on slower machines: **Rive tile frame rate** (full, 30 or 15 fps) and **Maximum Rive players**.
 
 ## Known limitations
