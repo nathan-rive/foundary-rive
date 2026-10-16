@@ -1,7 +1,7 @@
 import assert from "./assert.mjs";
 import { registerDocument, socket, USERS } from "./setup.mjs";
 import * as sync from "../scripts/sync.mjs";
-import { ACTION_FIRE, ACTION_GET, ACTION_SET, fireRive, readRiveValue, registerMattIntegration, setRiveValue } from "../scripts/integrations/matt.mjs";
+import { ACTION_FIRE, ACTION_GET, ACTION_SET, fireRive, readRiveValue, registerMattIntegration, setRiveValue, unquote } from "../scripts/integrations/matt.mjs";
 
 /** Records what a module registers, the way MATT's registerTileGroup/registerTileAction would. */
 function fakeMatt(entities = []) {
@@ -16,7 +16,11 @@ function fakeMatt(entities = []) {
       this.actions[`${namespace}.${name}`] = action;
       return true;
     },
-    getEntities: async () => entities,
+    entries: [],
+    async getEntities(args, defaultType, entry) {
+      this.entries.push(entry);
+      return entities;
+    },
     getValue: async val => val,
     entityName: async () => "This Tile"
   };
@@ -141,6 +145,35 @@ export const tests = [
     assert.equal(result.rive.x, "a");
     assert.equal(tile.updates.length, 0);
     assert.equal(readRiveValue(plain, "property", "x"), null);
+  }],
+  ["a blank entity means This Tile, not MATT's fallback to the triggering token", async () => {
+    const app = fakeMatt([]);
+    Hooks.callAll("setupTileActions", app);
+    for (const entity of ["", undefined, null, {}]) {
+      await app.actions[`foundry-rive.${ACTION_SET}`].fn({ action: { data: { entity, kind: "property", name: "state", value: "active" } } });
+    }
+    assert.equal(JSON.stringify(app.entries), JSON.stringify([{ id: "tile" }, { id: "tile" }, { id: "tile" }, { id: "tile" }]));
+    app.entries.length = 0;
+    await app.actions[`foundry-rive.${ACTION_FIRE}`].fn({ action: { data: { entity: "", kind: "property", name: "go" } } });
+    await app.actions[`foundry-rive.${ACTION_GET}`].fn({ action: { data: { entity: "", kind: "property", name: "state" } } });
+    await app.actions[`foundry-rive.${ACTION_SET}`].fn({ action: { data: { entity: { id: "token" }, kind: "property", name: "state", value: "x" } } });
+    assert.equal(JSON.stringify(app.entries), JSON.stringify([{ id: "tile" }, { id: "tile" }, undefined]));
+  }],
+  ["quoted values lose one pair of quotes", () => {
+    assert.equal(unquote('"active"'), "active");
+    assert.equal(unquote("'active'"), "active");
+    assert.equal(unquote(' "two words" '), "two words");
+    assert.equal(unquote('"mismatched\''), '"mismatched\'');
+    assert.equal(unquote('say "hi"'), 'say "hi"');
+    assert.equal(unquote(7), 7);
+  }],
+  ["setting an enum with a quoted value sets the option", async () => {
+    const tile = riveTile("q1");
+    const app = fakeMatt([tile]);
+    Hooks.callAll("setupTileActions", app);
+    await app.actions[`foundry-rive.${ACTION_SET}`].fn({ action: { data: { entity: "", kind: "property", name: "state", value: '"active"', remember: true } } });
+    assert.equal(sync.knownValues(tile.uuid).property.get("state"), "active");
+    assert.equal(JSON.stringify(tile.updates[0]), JSON.stringify({ "flags.foundry-rive.properties": [{ name: "state", value: "active" }] }));
   }],
   ["players can't set or fire (MATT runs actions on the GM)", async () => {
     const tile = riveTile("m6");

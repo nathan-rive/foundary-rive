@@ -90,8 +90,8 @@ function setAction(app) {
       const kind = kindOf(action);
       const name = String(action?.data?.name ?? "").trim();
       if (!name) return;
-      for (const entity of await app.getEntities(args, "tiles")) {
-        const value = await app.getValue(action.data.value ?? "", args, entity);
+      for (const entity of await entitiesFor(app, args)) {
+        const value = unquote(await app.getValue(action.data.value ?? "", args, entity));
         await setRiveValue(docOf(entity), kind, name, value, { remember: Boolean(action.data.remember) });
       }
     },
@@ -117,7 +117,7 @@ function fireAction(app) {
       const { action } = args;
       const name = String(action?.data?.name ?? "").trim();
       if (!name) return;
-      for (const entity of await app.getEntities(args, "tiles")) fireRive(docOf(entity), kindOf(action), name);
+      for (const entity of await entitiesFor(app, args)) fireRive(docOf(entity), kindOf(action), name);
     },
     content: async (trigger, action) => {
       const entityName = await app.entityName(action.data?.entity || "tile", "tiles");
@@ -142,7 +142,7 @@ function getAction(app) {
       const name = String(action?.data?.name ?? "").trim();
       if (!name) return;
       const variable = String(action.data.variable ?? "").trim() || name;
-      for (const entity of await app.getEntities(args, "tiles")) {
+      for (const entity of await entitiesFor(app, args)) {
         const doc = docOf(entity);
         if (!isRiveDoc(doc)) continue;
         // Merged into MATT's action values, so later actions can use
@@ -235,6 +235,28 @@ export function fireRive(doc, kind, name) {
 
 function isRiveDoc(doc) {
   return ["Tile", "Token"].includes(doc?.documentName) && Boolean(riveFlags(doc));
+}
+
+/**
+ * The action's chosen entities, with "This Tile" when none was picked. MATT shows
+ * our default in its dialog but saves a blank entity until one is chosen, and
+ * resolves blanks through its own built-in action table, which doesn't know our
+ * actions: it would fall back to the triggering token instead of the tile.
+ */
+export function entitiesFor(app, args) {
+  const entity = args?.action?.data?.entity;
+  const blank = entity === undefined || entity === null || entity === "" || (typeof entity === "object" && !entity.id);
+  return app.getEntities(args, "tiles", blank ? { id: "tile" } : undefined);
+}
+
+/**
+ * MATT values are text, and people quote text out of habit (MATT's own
+ * comparisons want quotes): `"active"` and `'active'` mean `active`.
+ */
+export function unquote(value) {
+  if (typeof value !== "string") return value;
+  const match = /^\s*(["'])(.*)\1\s*$/s.exec(value);
+  return match ? match[2] : value;
 }
 
 /** MATT hands back documents, placeables or (for tokens) either. */
