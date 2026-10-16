@@ -8,8 +8,9 @@ bc814e551cc7  scripts/canvas/rive-canvas.mjs  [pre-document hook]  Hooks.on("pre
 668fef3728ce  scripts/canvas/rive-canvas.mjs  [document delete]  if (bridges.get(placeable) === bridge) bridges.delete(placeable);
 0c284c0d3ef1  scripts/canvas/rive-canvas.mjs  [document delete]  bridges.delete(placeable);
 1861e155738c  scripts/canvas/rive-canvas.mjs  [document update]  bridge.texture.baseTexture.update();
-bb03ec7c19fa  scripts/canvas/rive-config.mjs  [document update]  return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])));
-bc53daf8f981  scripts/canvas/rive-config.mjs  [document update]  return app.document.update(update);
+a5dfd22dad22  scripts/canvas/rive-config.mjs  [document delete]  riveTabOpen.delete(app.id);
+07cf85bfcc2a  scripts/canvas/rive-config.mjs  [document update]  return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])), { render: false });
+a3c1d07000d3  scripts/canvas/rive-config.mjs  [document update]  return app.document.update(update, { render: false });
 ca2078d68579  scripts/canvas/rive-config.mjs  [document delete]  previews.delete(appId);
 acef1e15d799  scripts/canvas/rive-config.mjs  [file upload / folder]  srcInput.value = await uploadRiv(file);
 e81c1f505e75  scripts/canvas/rive-hud.mjs  [document update]  await doc.update({

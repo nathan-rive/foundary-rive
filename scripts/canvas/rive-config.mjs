@@ -15,7 +15,10 @@ import { hasDynamicRing, riveState } from "./rive-canvas.mjs";
 export function registerRiveConfig() {
   for (const sheet of ["TileConfig", "TokenConfig"]) {
     Hooks.on(`render${sheet}`, (app, html) => injectTab(app, html[0] ?? html));
-    Hooks.on(`close${sheet}`, app => releasePreview(app.id));
+    Hooks.on(`close${sheet}`, app => {
+      releasePreview(app.id);
+      riveTabOpen.delete(app.id);
+    });
   }
 }
 
@@ -24,15 +27,26 @@ function isPrototype(app) {
   return Boolean(app.isPrototype ?? app.object?.constructor?.name === "PrototypeToken");
 }
 
-/** Saves `{inputs?, properties?, bindings?}` lists onto the sheet's document flags. */
+/**
+ * Saves `{inputs?, properties?, bindings?}` lists onto the sheet's document flags.
+ * `render: false` keeps the open sheet as it is (tab, scroll, focus, unsaved fields):
+ * the editor already shows the saved values, and the canvas still updates.
+ */
 function saveFlags(app, changes) {
   const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`flags.${MODULE_ID}.${key}`, list]));
   if (isPrototype(app)) {
     const actor = app.object.parent ?? app.object.actor;
-    return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])));
+    return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])), { render: false });
   }
-  return app.document.update(update);
+  return app.document.update(update, { render: false });
 }
+
+/**
+ * Config app id -> whether the Rive tab was the open one. Foundry's tab controller
+ * re-activates its remembered tab before our render hook adds the Rive tab, falls
+ * back to the first tab, and forgets "rive"; so we remember it ourselves.
+ */
+const riveTabOpen = new Map();
 
 /** Config app id -> hidden player used to list the file's contents and edit defaults. */
 const previews = new Map();
@@ -136,9 +150,16 @@ function injectTab(app, root) {
   srcInput.addEventListener("change", suggest);
   if (srcInput.value) suggest();
 
-  // AppV1 tabs bind by delegation, so the new tab works; restore it if it was open.
-  const tabs = app._tabs?.find(t => !group || t._navSelector?.includes(`"${group}"`)) ?? app._tabs?.[0];
-  if (tabs?.active === "rive") tabs.activate("rive");
+  // AppV1 tabs bind by delegation, so the new tab works. Track which tab is open,
+  // and reopen the Rive tab after a re-render if it was the open one.
+  nav.addEventListener("click", event => {
+    const item = event.target.closest("[data-tab]");
+    if (item) riveTabOpen.set(app.id, item.dataset.tab === "rive");
+  });
+  if (riveTabOpen.get(app.id)) {
+    const tabs = app._tabs?.find(t => !group || t._navSelector?.includes(`"${group}"`)) ?? app._tabs?.[0];
+    tabs?.activate("rive");
+  }
   app.setPosition({ height: "auto" });
 }
 

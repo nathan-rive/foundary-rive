@@ -28,19 +28,28 @@ globalThis.game = {
   users: Object.assign(users, { activeGM: gm }),
   socket,
   world: { id: "test-world" },
+  actors: new Map(),
   modules: new Map(),
   i18n: { localize: key => key, format: key => key }
 };
 
 globalThis.Hooks = {
   calls: [],
+  handlers: new Map(),
+  nextId: 1,
   callAll(name, ...args) {
     this.calls.push({ name, args });
+    for (const fn of this.handlers.get(name)?.values() ?? []) fn(...args);
   },
-  on() {
-    return 0;
+  on(name, fn) {
+    const id = this.nextId++;
+    if (!this.handlers.has(name)) this.handlers.set(name, new Map());
+    this.handlers.get(name).set(id, fn);
+    return id;
   },
-  off() {}
+  off(name, id) {
+    this.handlers.get(name)?.delete(id);
+  }
 };
 
 const documents = new Map();

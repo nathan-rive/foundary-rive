@@ -5,6 +5,8 @@
  * one schema covers every type and a changed file never fails validation.
  */
 
+import { parseColor } from "./colors.mjs";
+
 const INPUT_TYPES = { 56: "number", 58: "trigger", 59: "boolean" };
 
 /** Property types we can show and store. Others (lists, images, nested models) are skipped. */
@@ -66,7 +68,8 @@ export function setProperty(player, name, value) {
     case "number": return setIfFinite(vm.number(name), Number(value));
     case "string": { const p = vm.string(name); if (p) p.value = String(value ?? ""); return; }
     case "boolean": { const p = vm.boolean(name); if (p) p.value = toBoolean(value); return; }
-    case "color": { const p = vm.color(name); const argb = hexToArgb(value); if (p && argb !== null) p.value = argb; return; }
+    // Hex or a CSS color name, so bound text such as a character's eye color works.
+    case "color": { const p = vm.color(name); const argb = parseColor(String(value ?? "")); if (p && argb !== null) p.value = argb; return; }
     case "enumType": { const p = vm.enum(name); if (p?.values?.includes(String(value))) p.value = String(value); return; }
     case "trigger": if (toBoolean(value)) vm.trigger(name)?.trigger(); return;
   }
@@ -82,7 +85,7 @@ export function applyProperties(player, entries = []) {
  * @param {object} [options]
  * @param {boolean} [options.applyNow=true]  set the current values immediately (applyInitialState
  *   passes false and sequences them itself)
- * @param {{actor?: Actor}} [options.context]  what `@actor` means (a token's own actor)
+ * @param {{actor?: Actor, token?: TokenDocument}} [options.context]  what `@actor` / `@token` mean
  * @returns {() => void} stops listening
  */
 export function bindProperties(player, bindings = [], { applyNow = true, context } = {}) {
@@ -94,44 +97,101 @@ export function bindProperties(player, bindings = [], { applyNow = true, context
       console.warn(`foundry-rive | binding for "${name}": no document ${uuid}`);
       continue;
     }
-    // A token's unlinked actor is a synthetic document with its own UUID. It also
-    // inherits from its base actor, and a base-actor change fires the hook for the
-    // base actor only, so watch both and always read through the (current) synthetic.
-    const watched = new Set([doc.uuid]);
-    if (doc.isToken) {
-      const base = game.actors.get(doc.id);
-      if (base) watched.add(base.uuid);
-    }
-    let last = foundry.utils.getProperty(doc, path);
+    const watched = watchedUuids(doc);
+    let last = readBinding(doc, path);
     if (applyNow) setProperty(player, name, last);
-    const hook = `update${doc.documentName}`;
-    const id = Hooks.on(hook, updated => {
-      if (!watched.has(updated.uuid)) return;
+    const refresh = () => {
       const current = resolveBinding(uuid, context) ?? doc;
-      const value = foundry.utils.getProperty(current, path);
+      const value = readBinding(current, path);
       if (value === last) return;
       last = value;
       setProperty(player, name, value);
-    });
-    stops.push(() => Hooks.off(hook, id));
+    };
+    // Statuses and effect-driven values change through Active Effects, which fire
+    // their own hooks rather than the actor's. Re-read one tick later, once Foundry
+    // has re-prepared the actor's derived data (such as `statuses`).
+    const onChange = relevant => document => {
+      if (relevant(document)) setTimeout(refresh, 0);
+    };
+    const hooks = [[`update${doc.documentName}`, onChange(d => watched.has(d?.uuid))]];
+    if (actorOf(doc)) {
+      const isOurs = effect => watched.has(effectActor(effect)?.uuid);
+      if (doc.documentName !== "Actor") hooks.push(["updateActor", onChange(d => watched.has(d?.uuid))]);
+      for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) hooks.push([hook, onChange(isOurs)]);
+    }
+    for (const [hook, fn] of hooks) {
+      const id = Hooks.on(hook, fn);
+      stops.push(() => Hooks.off(hook, id));
+    }
   }
   return () => stops.forEach(stop => stop());
 }
 
-/** Shorthand a binding can use instead of a UUID: the token's own actor. */
-export const ACTOR_SHORTHAND = "@actor";
+/**
+ * The document UUIDs whose changes can change a binding on `doc`: the document,
+ * its actor (for a token), and, for a token's unlinked (synthetic) actor, the base
+ * actor it inherits from (a base-actor change fires the base actor's hooks only).
+ */
+function watchedUuids(doc) {
+  const watched = new Set([doc.uuid]);
+  const actor = actorOf(doc);
+  if (actor) {
+    watched.add(actor.uuid);
+    if (actor.isToken) {
+      const base = game.actors.get(actor.id);
+      if (base) watched.add(base.uuid);
+    }
+  }
+  return watched;
+}
 
-/** The document a binding reads: `@actor` resolves through `context`, anything else as a UUID. */
+/** The actor whose statuses a document has: an actor itself, or a token's actor. */
+function actorOf(doc) {
+  if (doc?.documentName === "Actor") return doc;
+  if (doc?.documentName === "Token") return doc.actor ?? null;
+  return null;
+}
+
+/** The actor an Active Effect belongs to, directly or through an owned item. */
+function effectActor(effect) {
+  let parent = effect?.parent;
+  if (parent?.documentName === "Item") parent = parent.parent;
+  return parent?.documentName === "Actor" ? parent : null;
+}
+
+/** Shorthands a binding can use instead of a UUID: the token's own actor, or the token itself. */
+export const ACTOR_SHORTHAND = "@actor";
+export const TOKEN_SHORTHAND = "@token";
+
+/** A binding path of `status:<id>` reads whether the actor has that status (condition). */
+export const STATUS_PREFIX = "status:";
+
+/** The document a binding reads: `@actor` / `@token` resolve through `context`, anything else as a UUID. */
 export function resolveBinding(uuid, context) {
   if (uuid === ACTOR_SHORTHAND) return context?.actor ?? null;
+  if (uuid === TOKEN_SHORTHAND) return context?.token ?? null;
   return fromUuidSync(uuid);
+}
+
+/**
+ * The value a binding reads from a document: `status:<id>` is true when the
+ * actor (or the token's actor) has that status effect, e.g. `status:prone`;
+ * anything else is a data path such as `system.attributes.hp.value`.
+ */
+export function readBinding(doc, path) {
+  if (typeof path === "string" && path.startsWith(STATUS_PREFIX)) {
+    const id = path.slice(STATUS_PREFIX.length).trim();
+    return Boolean(id && actorOf(doc)?.statuses?.has(id));
+  }
+  return foundry.utils.getProperty(doc, path);
 }
 
 /**
  * Brings a freshly loaded player to its starting values the same way on every
  * client: one value per frame, in the order the file lists its inputs and
- * properties. Each value comes from the highest source that has one: live GM
- * value (sync), then bound document data, then the stored default.
+ * properties. Each value comes from the highest source that has one: bound
+ * document data (bound properties only), then the live GM value (sync), then
+ * the stored default.
  *
  * Why: a Rive state machine can react to the order values change in, and
  * several changes in one frame can behave differently from separate ones. So
@@ -156,13 +216,14 @@ export async function applyInitialState(player, { target, inputs = [], propertie
   };
   const bound = new Map(bindings.filter(b => b.name && b.uuid && b.path).map(b => [b.name, b]));
   const valueFor = (kind, name) => {
-    const live = target && liveValues ? liveValues(target)[kind] : null;
-    if (live?.has(name)) return { value: live.get(name) };
+    // A bound property follows its data; live values only fill in if the document is gone.
     if (kind === "property" && bound.has(name)) {
       const { uuid, path } = bound.get(name);
       const doc = resolveBinding(uuid, context);
-      if (doc) return { value: foundry.utils.getProperty(doc, path) };
+      if (doc) return { value: readBinding(doc, path) };
     }
+    const live = target && liveValues ? liveValues(target)[kind] : null;
+    if (live?.has(name)) return { value: live.get(name) };
     if (stored[kind].has(name)) return { value: stored[kind].get(name) };
     return null;
   };
@@ -219,12 +280,4 @@ function toBoolean(value) {
 function argbToHex(argb) {
   if (typeof argb !== "number") return "#000000";
   return `#${(argb & 0xffffff).toString(16).padStart(6, "0")}`;
-}
-
-/** "#rrggbb" or "#rrggbbaa" -> ARGB as a signed 32-bit int (opaque unless alpha given). */
-function hexToArgb(hex) {
-  const m = /^#?([\da-f]{6})([\da-f]{2})?$/i.exec(String(hex ?? ""));
-  if (!m) return null;
-  const alpha = m[2] ? parseInt(m[2], 16) : 0xff;
-  return (alpha << 24) | parseInt(m[1], 16);
 }

@@ -15,12 +15,16 @@ import { describe } from "../state.mjs";
  * @param {(kind, name) => void} config.onFire
  * @param {boolean} [config.live=false]                         report every slider step, hide reset
  * @param {{list: object[], onChange: (name, binding) => void}} [config.bindings]
+ * @param {Set<string>} [config.hiddenProperties]               property names not to show (e.g. bound ones, live)
  */
-export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings }) {
-  const { inputs, properties } = describe(player);
+export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings, hiddenProperties }) {
+  const described = describe(player);
+  const inputs = described.inputs;
+  const properties = described.properties.filter(p => !hiddenProperties?.has(p.name));
   container.replaceChildren();
   if (!inputs.length && !properties.length) {
-    container.append(hint(game.i18n.localize("FOUNDRY_RIVE.NoState")));
+    const allHidden = described.properties.length > 0;
+    container.append(hint(game.i18n.localize(allHidden ? "FOUNDRY_RIVE.LiveAllBound" : "FOUNDRY_RIVE.NoState")));
     return;
   }
   const boundBy = new Map((bindings?.list ?? []).map(b => [b.name, b]));
@@ -109,17 +113,42 @@ function valueControl(type, value, options, live, onChange) {
   }
 }
 
+/**
+ * Suggestions for binding fields, shared by every editor on the page:
+ * `@actor` / `@token` for the document, and `status:<id>` for each status effect
+ * (condition) this world defines.
+ */
+function ensureBindingSuggestions() {
+  if (document.getElementById("foundry-rive-binding-docs")) return;
+  const docs = document.createElement("datalist");
+  docs.id = "foundry-rive-binding-docs";
+  docs.append(
+    new Option(game.i18n.localize("FOUNDRY_RIVE.BindActorShorthand"), "@actor"),
+    new Option(game.i18n.localize("FOUNDRY_RIVE.BindTokenShorthand"), "@token")
+  );
+  const paths = document.createElement("datalist");
+  paths.id = "foundry-rive-binding-paths";
+  for (const status of CONFIG.statusEffects ?? []) {
+    if (!status?.id) continue;
+    paths.append(new Option(game.i18n.localize(status.name ?? status.label ?? status.id), `status:${status.id}`));
+  }
+  document.body.append(docs, paths);
+}
+
 function bindingRow(binding, onChange) {
+  ensureBindingSuggestions();
   const uuid = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.uuid ?? "",
     placeholder: game.i18n.localize("FOUNDRY_RIVE.BindUuid")
   });
+  uuid.setAttribute("list", "foundry-rive-binding-docs");
   const path = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.path ?? "",
     placeholder: game.i18n.localize("FOUNDRY_RIVE.BindPath")
   });
+  path.setAttribute("list", "foundry-rive-binding-paths");
   const commit = () => onChange({ uuid: uuid.value.trim(), path: path.value.trim() });
   uuid.addEventListener("change", commit);
   path.addEventListener("change", commit);
