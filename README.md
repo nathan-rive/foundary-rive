@@ -4,11 +4,13 @@ Embed interactive [Rive](https://rive.app) (`.riv`) animations in Foundry VTT. T
 
 ## Install
 
-In Foundry's setup screen, open **Add-on Modules → Install Module** and paste this manifest URL:
+In Foundry's setup screen, open **Add-on Modules → Install Module** and paste the manifest URL for your Foundry version:
 
-```
-https://github.com/nathan-rive/foundary-rive/releases/latest/download/module.json
-```
+| Foundry | Manifest URL |
+| --- | --- |
+| v12 | `https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json` |
+
+Each channel only ever offers releases built for that Foundry version, so Foundry's update check stays on the right line.
 
 ## Rive journal pages
 
@@ -58,4 +60,4 @@ Use `await game.modules.get("foundry-rive").api.wrapper.uploadRiv(file)` to wrap
 
 ## Releasing
 
-Publish a GitHub release tagged `vX.Y.Z`. The release workflow vendors the pinned `@rive-app/canvas` runtime into `lib/`, stamps the version into `module.json`, and attaches `module.json` and `module.zip` to the release.
+Publish a GitHub release tagged `vX.Y.Z`. The release workflow vendors the pinned `@rive-app/canvas` runtime into `lib/`, stamps the version into `module.json`, and attaches `module.json` and `module.zip` to the release. A normal release also replaces the assets on the rolling `channel-v12` pre-release, which is what servers install and update from. Pre-releases (spikes, test builds) get a manifest pointing at their own tag and leave the channel alone; install one from its own `releases/download/<tag>/module.json`.

@@ -1,6 +1,14 @@
 # Publishing a GitHub release tagged vX.Y.Z builds module.zip (with the pinned
-# Rive runtime vendored into lib/) and attaches it plus module.json. Foundry
-# installs from: https://github.com/nathan-rive/foundary-rive/releases/latest/download/module.json
+# Rive runtime vendored into lib/) and attaches it plus module.json.
+#
+# Release channels: servers install and update from a channel manifest, not
+# releases/latest, so a later line for another Foundry generation can't reach
+# them by accident. Every normal release also replaces the assets on the
+# rolling "channel-<CHANNEL>" release (itself a pre-release, so releases/latest
+# is unaffected). Foundry v12 servers install from:
+#   https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json
+# Pre-releases (spikes, tests) keep a manifest pointing at their own tag and
+# never touch the channel.
 name: Release
 
 on:
@@ -12,6 +20,9 @@ permissions:
 
 env:
   RIVE_VERSION: 2.44.2
+  # The Foundry generation this branch's releases are for. A future v13+ line
+  # would publish from its own branch with CHANNEL: v13 (or similar).
+  CHANNEL: v12
 
 jobs:
   build:
@@ -32,11 +43,18 @@ jobs:
           cp rive-pkg/package/LICENSE lib/RIVE-LICENSE 2>/dev/null || true
 
       - name: Stamp the manifest
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           REPO="https://github.com/${GITHUB_REPOSITORY}"
+          if [ "$PRERELEASE" = "true" ]; then
+            MANIFEST="$REPO/releases/download/${GITHUB_REF_NAME}/module.json"
+          else
+            MANIFEST="$REPO/releases/download/channel-${CHANNEL}/module.json"
+          fi
           jq --arg v "$VERSION" \
-             --arg manifest "$REPO/releases/latest/download/module.json" \
+             --arg manifest "$MANIFEST" \
              --arg download "$REPO/releases/download/${GITHUB_REF_NAME}/module.zip" \
              '.version = $v | .manifest = $manifest | .download = $download' \
              module.json > module.stamped.json
@@ -49,3 +67,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" module.json module.zip --clobber
+
+      - name: Update the channel
+        if: ${{ !github.event.release.prerelease }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="channel-${CHANNEL}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "Channel: Foundry ${CHANNEL}" \
+              --notes "Rolling install channel for Foundry ${CHANNEL}. Install from this release's module.json; its assets are replaced by every ${CHANNEL} release."
+          fi
+          gh release upload "$TAG" module.json module.zip --clobber
