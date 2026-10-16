@@ -41,7 +41,7 @@ export function openLiveWindow(tile) {
     {
       title: game.i18n.format("FOUNDRY_RIVE.TileLiveTitle", { name: riveFlags(tile.document).src.split("/").pop() }),
       content: `
-        <p class="notes">${game.i18n.localize("FOUNDRY_RIVE.LiveHint")}</p>
+        <p class="notes">${game.i18n.localize("FOUNDRY_RIVE.TileLiveHint")}</p>
         <div class="rive-live-controls"></div>
         <button type="button" class="rive-live-save"><i class="fa-solid fa-floppy-disk"></i> ${game.i18n.localize("FOUNDRY_RIVE.LiveSave")}</button>`,
       buttons: {},
