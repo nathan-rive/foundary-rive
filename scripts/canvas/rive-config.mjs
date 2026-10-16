@@ -58,9 +58,15 @@ function releasePreview(appId) {
 
 function injectTab(app, root) {
   // Token config has several tab groups (main, light, vision); join the main one.
-  const nav = root.querySelector('nav.sheet-tabs[data-group="main"]') ?? root.querySelector("nav.sheet-tabs, nav.tabs");
+  // Other modules nest their own tabs inside a tab (Monk's Active Tile Triggers
+  // does in Triggers), so only top-level tabs count: one that isn't inside a nav's
+  // tab and isn't inside another tab.
+  const nav = root.querySelector('nav.sheet-tabs[data-group="main"]')
+    ?? [...root.querySelectorAll("nav.sheet-tabs, nav.tabs")].find(n => !n.closest(".tab"));
   const group = nav?.dataset.group;
-  const lastTab = [...root.querySelectorAll(group ? `.tab[data-group="${group}"]` : ".tab[data-tab]")].at(-1);
+  const lastTab = [...root.querySelectorAll(group ? `.tab[data-group="${group}"]` : ".tab[data-tab]")]
+    .filter(tab => !tab.parentElement.closest(".tab"))
+    .at(-1);
   if (!nav || !lastTab || root.querySelector('.tab[data-tab="rive"]')) return;
 
   const isToken = app.object?.documentName === "Token" || isPrototype(app);
@@ -157,7 +163,7 @@ function injectTab(app, root) {
     if (item) riveTabOpen.set(app.id, item.dataset.tab === "rive");
   });
   if (riveTabOpen.get(app.id)) {
-    const tabs = app._tabs?.find(t => !group || t._navSelector?.includes(`"${group}"`)) ?? app._tabs?.[0];
+    const tabs = app._tabs?.find(t => { try { return nav.matches(t._navSelector); } catch { return false; } }) ?? app._tabs?.[0];
     tabs?.activate("rive");
   }
   app.setPosition({ height: "auto" });
