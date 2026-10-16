@@ -133,13 +133,27 @@ Values that a system calculates from owned items (in dnd5e, for example AC from 
 
 Two client settings help on slower machines: **Rive tile frame rate** (full, 30 or 15 fps) and **Maximum Rive players**.
 
+## Monk's Active Tile Triggers
+
+With [Monk's Active Tile Triggers](https://foundryvtt.com/packages/monks-active-tiles) (12.02 for Foundry v12) active, tile actions get a **Rive** group, so world events can drive Rive tiles and tokens: a token walks onto a trap tile and the trap springs, a door tile is clicked and a sign lights up, a combat round starts and a banner changes.
+
+- **Set Rive value**: sets a view model property or state machine input on the chosen tiles or tokens (**This Tile** by default, or the triggering token, tiles within the area, the previous action's entities, or Tagger tags). The value can be text, a number, `true`/`false`, a color (hex or CSS name) or an enum option (with or without quotes: `active` and `"active"` both work), and MATT's `{{token.name}}`-style values and `[[1d6]]` rolls work too. Tick **Remember** to also save it as that tile's or token's default, so it stays after everyone reloads; without it, the value lasts as long as a GM stays connected, like the GM live controls.
+- **Fire Rive trigger**: fires a trigger property or trigger input once, for everyone viewing the scene right now.
+- **Get Rive value**: reads a property or input so later actions can branch on it. The value is stored as `rive.<name>` (or the name you give in **Save as**): use it in MATT's **Check value** filter (Value Name `rive.sprung`, with Goto landing on fail) or in text as `{{value.rive.sprung}}`. Compare numbers as usual (`> 3`), text in quotes (`"Open"`), and for `true`/`false` check `true` and send `false` to the fail landing. It reads what the GM's client is drawing when the GM is on that scene (including changes the file's own state machine made); otherwise the property's bound data, live value or saved default, and nothing for a value only the file itself defines.
+
+Names are the ones listed on the tile's or token's **Rive** tab. Actions run on the GM's client (MATT sends players' triggers to the GM), so a GM must be connected. Properties bound to data are left alone; they keep following their data.
+
+A walk-over trap, for example: give a Rive tile a boolean property `sprung` that the file's state machine animates, then in the tile's MATT config add an **Enter** trigger with **Set Rive value** → `sprung` = `true`, **Remember** ticked. For a one-off effect, use **Fire Rive trigger** on a trigger property instead.
+
+To spring a trap only once, give the tile these actions in order: **Get Rive value** `sprung`; **Check value** with Value Name `rive.sprung`, value `true` and Goto landing on fail `arm`; a **Landing** named `arm` (with Stop when reached in code ticked, the default); then **Set Rive value** and **Fire Rive trigger**. While the trap is unsprung the check fails and jumps past the landing to spring it; once sprung, the check passes and the flow stops at the landing.
+
 ## Known limitations
 
-- **Live sync shares values, not animation history.** Journal pages and tiles sync the *current* values of inputs and view model properties. A Rive state machine can also react to the *order* values changed in (for example a transition that fires whenever a number changes). A client that joins later only receives the final values, so with that kind of logic its animation can settle in a different state from the GM's. Every client applies starting values the same way (one per frame, in the file's own order: live value, else bound data, else stored default), so clients that load fresh agree with each other; a GM who watched a series of live edits may still differ. For files driven by synced values, make the visuals depend on the current values (for example transitions with `bool == true` / `bool == false` conditions) and keep triggers and change-fired transitions for momentary effects.
+- **Live sync shares values, not animation history.** Journal pages and tiles sync the *current* values of inputs and view model properties. A Rive state machine can also react to the *order* values changed in (for example a transition that fires whenever a number changes). A client that joins later only receives the final values, so with that kind of logic its animation can settle in a different state from the GM's. Every client applies starting values the same way (one per frame, in the file's own order: bound data for bound properties, else live value, else stored default), so clients that load fresh agree with each other; a GM who watched a series of live edits may still differ. For files driven by synced values, make the visuals depend on the current values (for example transitions with `bool == true` / `bool == false` conditions) and keep triggers and change-fired transitions for momentary effects.
 - **Rive runtime 2.44.2: feather direction changes aren't redrawn until the shape's geometry changes.** When a data-bound value switches a fill's feathering between inner and outer, the shape keeps rendering the old way (or not at all) until something changes its geometry, such as a corner radius. This happens with both the Canvas2D and WebGL2 web runtimes; the Rive editor is unaffected. Because it depends on what changed last, it can also make two clients with identical values look different. Workaround in the file: change the shape's geometry (even by a tiny amount) whenever the feather direction changes.
 - **Rive scripts must be signed.** Rive's web runtimes only run scripts in files exported or published signed from Rive (in the editor, or `rive --publish` with the Rive CLI; this needs a Rive account, and a clean file without a watermark needs a Cadet plan or higher). A local `rive --once` build is unsigned, and its scripts are refused: anything they draw or drive doesn't happen, so a file whose visuals are all scripted shows nothing. Rive for Foundry tells you when that happens: on the page's or the Rive tab's status line, with a one-time notification for GMs on scene tiles and tokens, in the browser console, and in `api.healthCheck()`.
 - **Foundry v12 only for now.** The release channel above is for v12; newer Foundry versions are planned through the same codebase.
-- **If you disable the module:** Rive settings on tiles and tokens simply go unused and each keeps its own image, except a Rive tile that had no image of its own, which shows nothing (its image is a transparent placeholder). Rive journal pages are unavailable until the module is enabled again; their data isn't touched.
+- **If you disable the module:** Rive settings on tiles and tokens simply go unused and each keeps its own image, except a Rive tile that had no image of its own, which shows nothing (its image is a transparent placeholder). Rive journal pages are unavailable until the module is enabled again; their data isn't touched. Rive actions in Monk's Active Tile Triggers stay in the tile's action list and are skipped until the module is back.
 
 ## What Rive for Foundry changes in your world
 
@@ -148,13 +162,13 @@ Rive for Foundry only writes its own data, and only when you use it:
 | What | When |
 | --- | --- |
 | Journal pages of the **Rive** type (their settings, defaults and bindings) | When you create or edit a Rive page, or a GM saves live values as defaults |
-| `flags.foundry-rive` on tiles and tokens (Rive file, artboard, state machine, fit, defaults, bindings) | When you edit a tile's or token's **Rive** tab, or a GM saves live values as defaults |
+| `flags.foundry-rive` on tiles and tokens (Rive file, artboard, state machine, fit, defaults, bindings) | When you edit a tile's or token's **Rive** tab, a GM saves live values as defaults, or a Monk's Active Tile Triggers **Set Rive value** action with **Remember** runs |
 | `prototypeToken.flags.foundry-rive` on actors | When you edit the **Rive** tab of an actor's prototype token |
 | A tile's image, set to a transparent placeholder | Only for a Rive tile that has no image of its own (Foundry needs an image to draw a tile) |
 | Uploaded `.riv.json` files in `rive/<world-id>/` in your user data folder | When someone with upload permission uses an upload button |
 | Client settings (frame rate, maximum players) | When you change them in Configure Settings |
 
-It never deletes documents or files, never changes permissions, and never edits documents that aren't Rive pages, tiles or tokens. Live GM controls are sent over the module's socket and change only what each client is drawing; nothing is saved unless a GM clicks **Save current values as defaults**.
+It never deletes documents or files, never changes permissions, and never edits documents that aren't Rive pages, tiles or tokens. Live GM controls are sent over the module's socket and change only what each client is drawing; nothing is saved unless a GM clicks **Save current values as defaults** (or a tile action has **Remember** ticked).
 
 ## Developer tools
 

@@ -41,6 +41,7 @@ fb3d441a6103  scripts/canvas/rive-hud.mjs  [world: document delete]  windows.del
 fcb09c428da5  scripts/dev/health-check.mjs  [client: core patch]  console.error = capture;
 614dbe34c688  scripts/dev/health-check.mjs  [client: core patch]  if (console.error === capture) console.error = original;
 0b7cec482ee8  scripts/enricher.mjs  [client: destroy]  if (!canvas.isConnected) return player.destroy();
+dfb053543599  scripts/integrations/matt.mjs  [world: document update]  await doc.update({ [`flags.${MODULE_ID}.${key}`]: next });
 3dd6a199e6f6  scripts/journal/rive-page-sheet.mjs  [client: destroy]  if (!canvas.isConnected) return player.destroy();
 b424f13f77ce  scripts/journal/rive-page-sheet.mjs  [world: document update]  return this.document.update(update);
 abe955ddb875  scripts/journal/rive-page-sheet.mjs  [world: document update]  await this.document.update({ "system.inputs": inputs, "system.properties": properties });

@@ -9,11 +9,16 @@ import * as sync from "./sync.mjs";
 import * as riveCanvas from "./canvas/rive-canvas.mjs";
 import { registerRiveConfig } from "./canvas/rive-config.mjs";
 import { registerRiveHud } from "./canvas/rive-hud.mjs";
+import { registerMattIntegration } from "./integrations/matt.mjs";
 import { startRuntime } from "./runtime-log.mjs";
 import { healthCheck } from "./dev/health-check.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
 export const PAGE_TYPE = `${MODULE_ID}.rive`;
+
+// Monk's Active Tile Triggers asks for actions during its own init, which may run
+// before ours, so listen from the start. Nothing happens if MATT isn't active.
+registerMattIntegration();
 
 Hooks.once("init", () => {
   // Self-host the WASM instead of letting the runtime fetch it from unpkg.

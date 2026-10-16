@@ -83,6 +83,7 @@ When a change touches the canvas, also try by hand: resizing the scene or changi
 | `scripts/enricher.mjs` | Inline `@Rive[...]` embeds. |
 | `scripts/stage.mjs` | Player sizing (aspect ratio). |
 | `scripts/canvas/` | Tiles and tokens: the texture bridge (`rive-canvas.mjs`), the config tab (`rive-config.mjs`) and HUD button (`rive-hud.mjs`). |
+| `scripts/integrations/` | Optional integrations with other modules, inert unless that module is active: Monk's Active Tile Triggers actions (`matt.mjs`). |
 | `scripts/dev/` | Developer tools: the in-world health check (`health-check.mjs`, `api.healthCheck()`). |
 | `scripts/spikes.mjs` | Developer checks callable from the console. |
 | `templates/`, `styles/`, `lang/`, `assets/` | Handlebars templates, CSS, localization and the transparent fallback image. |

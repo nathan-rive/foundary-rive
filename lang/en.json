@@ -77,6 +77,28 @@
     "BindTokenShorthand": "This token",
     "LiveBoundHidden": "Bound values aren't shown here; they follow their data.",
     "LiveAllBound": "Every value in this file is bound to data, so there's nothing to change live.",
+    "Matt": {
+      "Group": "Rive",
+      "SetAction": "Set Rive value",
+      "FireAction": "Fire Rive trigger",
+      "Kind": "Value type",
+      "KindProperty": "View model property",
+      "KindInput": "State machine input",
+      "Name": "Name",
+      "NameHelp": "The property or input name, as listed on the Rive tab of the tile or token.",
+      "FireHelp": "A trigger property or trigger input, as listed on the Rive tab of the tile or token.",
+      "Value": "Value",
+      "ValueHelp": "Text, a number, true/false, a color, or an enum option. {{token.name}}-style values and [[1d6]] rolls work too. Bound properties are skipped.",
+      "Remember": "Remember",
+      "RememberHelp": "Also save the value as the default, so it stays after a reload. Otherwise it lasts until the last GM leaves.",
+      "SetText": "<span class=\"action-style\">Set Rive</span> <span class=\"details-style\">{name} = {value}</span> on <span class=\"entity-style\">{entity}</span>{remember}",
+      "FireText": "<span class=\"action-style\">Fire Rive</span> <span class=\"details-style\">{name}</span> on <span class=\"entity-style\">{entity}</span>",
+      "Remembered": ", remembered",
+      "GetAction": "Get Rive value",
+      "Variable": "Save as",
+      "VariableHelp": "Name to store the value under (default: the Rive name). Later actions read it as rive.<name>, for example Check value with rive.sprung, or {{value.rive.sprung}}. Compare text in quotes (\"Open\"); for true/false, check true and use the fail landing for false.",
+      "GetText": "<span class=\"action-style\">Get Rive</span> <span class=\"details-style\">{name}</span> from <span class=\"entity-style\">{entity}</span> as <span class=\"value-style\">{variable}</span>"
+    },
     "ScriptsRefused": "This file's script(s) {names} didn't run: Rive only runs signed scripts on the web. Export or publish the file signed from Rive; until then, whatever they draw or drive won't show."
   }
 }
