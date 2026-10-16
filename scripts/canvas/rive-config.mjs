@@ -122,7 +122,7 @@ function injectTab(app, root) {
     if (!file) return;
     status.textContent = game.i18n.format("FOUNDRY_RIVE.Uploading", { name: file.name });
     try {
-      srcInput.value = await uploadRiv(file, { dir: `rive/${game.world.id}` });
+      srcInput.value = await uploadRiv(file);
       srcInput.dispatchEvent(new Event("change", { bubbles: true }));
       status.textContent = "";
     } catch (err) {

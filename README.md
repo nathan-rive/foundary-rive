@@ -60,6 +60,22 @@ Two client settings help on slower machines: **Rive tile frame rate** (full, 30 
 - **Live sync shares values, not animation history.** Journal pages and tiles sync the *current* values of inputs and view model properties. A Rive state machine can also react to the *order* values changed in (for example a transition that fires whenever a number changes). A client that joins later only receives the final values, so with that kind of logic its animation can settle in a different state from the GM's. Every client applies starting values the same way (one per frame, in the file's own order: live value, else bound data, else stored default), so clients that load fresh agree with each other; a GM who watched a series of live edits may still differ. For files driven by synced values, make the visuals depend on the current values (for example transitions with `bool == true` / `bool == false` conditions) and keep triggers and change-fired transitions for momentary effects.
 - **Rive runtime 2.44.2: feather direction changes aren't redrawn until the shape's geometry changes.** When a data-bound value switches a fill's feathering between inner and outer, the shape keeps rendering the old way (or not at all) until something changes its geometry, such as a corner radius. This happens with both the Canvas2D and WebGL2 web runtimes; the Rive editor is unaffected. Because it depends on what changed last, it can also make two clients with identical values look different. Workaround in the file: change the shape's geometry (even by a tiny amount) whenever the feather direction changes.
 - **Foundry v12 only for now.** The release channel above is for v12; newer Foundry versions are planned through the same codebase.
+- **If you disable the module:** Rive settings on tiles and tokens simply go unused and each keeps its own image, except a Rive tile that had no image of its own, which shows nothing (its image is a transparent placeholder). Rive journal pages are unavailable until the module is enabled again; their data isn't touched.
+
+## What Rive for Foundry changes in your world
+
+Rive for Foundry only writes its own data, and only when you use it:
+
+| What | When |
+| --- | --- |
+| Journal pages of the **Rive** type (their settings, defaults and bindings) | When you create or edit a Rive page, or a GM saves live values as defaults |
+| `flags.foundry-rive` on tiles and tokens (Rive file, artboard, state machine, fit, defaults, bindings) | When you edit a tile's or token's **Rive** tab, or a GM saves live values as defaults |
+| `prototypeToken.flags.foundry-rive` on actors | When you edit the **Rive** tab of an actor's prototype token |
+| A tile's image, set to a transparent placeholder | Only for a Rive tile that has no image of its own (Foundry needs an image to draw a tile) |
+| Uploaded `.riv.json` files in `rive/<world-id>/` in your user data folder | When someone with upload permission uses an upload button |
+| Client settings (frame rate, maximum players) | When you change them in Configure Settings |
+
+It never deletes documents or files, never changes permissions, and never edits documents that aren't Rive pages, tiles or tokens. Live GM controls are sent over the module's socket and change only what each client is drawing; nothing is saved unless a GM clicks **Save current values as defaults**.
 
 ## Developer tools
 

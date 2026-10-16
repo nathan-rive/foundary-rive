@@ -49,11 +49,27 @@ export async function wrap(riv, name) {
   return new File([body], `${base}${WRAPPED_SUFFIX}`, { type: "application/json" });
 }
 
+/** The only folder the module uploads into (and its subfolders): `rive/<world-id>`. */
+export function uploadRoot(worldId = game.world.id) {
+  return `rive/${worldId}`;
+}
+
+/** True if `dir` is the upload root or a folder inside it (no `..`, no other folders). */
+export function isAllowedUploadDir(dir, worldId) {
+  const root = uploadRoot(worldId);
+  const clean = String(dir ?? "").replace(/\/+$/, "");
+  return !clean.split("/").includes("..") && (clean === root || clean.startsWith(`${root}/`));
+}
+
 /**
- * Wraps and uploads a .riv through Foundry's normal upload path.
+ * Wraps and uploads a .riv through Foundry's normal upload path, into
+ * `rive/<world-id>/` or a folder inside it. The module's only upload path.
  * @returns {Promise<string>} the uploaded path, usable as a player `src`
  */
-export async function uploadRiv(file, { source = "data", dir = "rive" } = {}) {
+export async function uploadRiv(file, { source = "data", dir = uploadRoot() } = {}) {
+  if (source !== "data" || !isAllowedUploadDir(dir)) {
+    throw new Error(`Rive: uploads may only go to ${uploadRoot()}/ in the user data folder`);
+  }
   const wrapped = await wrap(file, file.name);
   // createDirectory isn't recursive, and fails harmlessly when a folder exists.
   const parts = dir.split("/");

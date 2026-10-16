@@ -31,6 +31,7 @@ function addButton(hud, root) {
 }
 
 export function openLiveWindow(placeable) {
+  if (!game.user.isGM) return;
   const doc = placeable.document;
   const uuid = doc.uuid;
   const existing = windows.get(uuid);

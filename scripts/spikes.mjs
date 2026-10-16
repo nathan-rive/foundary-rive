@@ -15,9 +15,9 @@ export async function wasm() {
 
 /**
  * Raw .riv uploads are refused by the server, so this checks the wrapped route:
- * wrap, upload to `rive-spike/`, then load the uploaded path back into a player (GM only).
+ * wrap, upload to `rive/<world-id>/spike/`, then load the uploaded path back into a player (GM only).
  */
-export async function upload({ src = SAMPLE_RIV, dir = "rive-spike" } = {}) {
+export async function upload({ src = SAMPLE_RIV, dir = `rive/${game.world.id}/spike` } = {}) {
   const result = { extensionListed: "riv" in CONST.UPLOADABLE_FILE_EXTENSIONS };
   const bytes = await (await fetch(src)).blob();
   const file = new File([bytes], src.split("/").pop());

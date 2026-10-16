@@ -99,6 +99,7 @@ export class RivePageSheet extends JournalPageSheet {
 
   /** Writes the current live values onto the page, so they apply on every load. */
   async #saveLiveAsDefaults() {
+    if (!game.user.isGM) return;
     const { inputs, properties } = withLiveValues(this.document.uuid, this.document.system);
     await this.document.update({ "system.inputs": inputs, "system.properties": properties });
     ui.notifications.info(game.i18n.localize("FOUNDRY_RIVE.LiveSaved"));
@@ -125,7 +126,7 @@ export class RivePageSheet extends JournalPageSheet {
     if (!file) return;
     const notice = ui.notifications.info(game.i18n.format("FOUNDRY_RIVE.Uploading", { name: file.name }), { permanent: true });
     try {
-      const src = await uploadRiv(file, { dir: `rive/${game.world.id}` });
+      const src = await uploadRiv(file);
       // A new file means new inputs and properties; old values may not apply.
       await this.document.update({
         "system.src": src,

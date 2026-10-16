@@ -34,6 +34,13 @@ jobs:
         with:
           node-version: 22
 
+      # Never ship a build that fails the tests or has unreviewed world-safety sites.
+      - name: Unit tests
+        run: node tests/run.mjs
+
+      - name: World-safety audit (every site reviewed)
+        run: python3 tools/audit.py --check
+
       - name: Vendor the Rive runtime
         run: |
           npm pack "@rive-app/canvas@${RIVE_VERSION}" --silent

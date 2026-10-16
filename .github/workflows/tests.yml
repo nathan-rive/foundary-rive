@@ -1,0 +1,23 @@
+# Tests and the world-safety audit on every push and pull request.
+# See "Before EVERY commit" in CLAUDE.md.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node tests/run.mjs
+
+      - name: World-safety audit (every site reviewed)
+        run: python3 tools/audit.py --check

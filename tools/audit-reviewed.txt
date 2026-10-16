@@ -1,0 +1,32 @@
+# Reviewed world-safety sites (tools/audit.py --accept).
+# key  file  [kinds]  code
+aa4bcb3336b1  scripts/canvas/rive-canvas.mjs  [pre-document hook]  Hooks.on("preCreateTile", doc => {
+5bddafcbcc2c  scripts/canvas/rive-canvas.mjs  [pre-hook source edit]  if (riveFlags(doc) && !doc.texture.src) doc.updateSource({ "texture.src": FALLBACK_IMAGE });
+bc814e551cc7  scripts/canvas/rive-canvas.mjs  [pre-document hook]  Hooks.on("preUpdateTile", (doc, changes) => {
+4601e169609a  scripts/canvas/rive-canvas.mjs  [pre-hook source edit]  if (riveFlags(merged) && !merged.texture?.src) foundry.utils.setProperty(changes, "texture.src", FALLBACK_IMAGE);
+080517fda8da  scripts/canvas/rive-canvas.mjs  [document update]  base.update();
+668fef3728ce  scripts/canvas/rive-canvas.mjs  [document delete]  if (bridges.get(placeable) === bridge) bridges.delete(placeable);
+0c284c0d3ef1  scripts/canvas/rive-canvas.mjs  [document delete]  bridges.delete(placeable);
+1861e155738c  scripts/canvas/rive-canvas.mjs  [document update]  bridge.texture.baseTexture.update();
+bb03ec7c19fa  scripts/canvas/rive-config.mjs  [document update]  return actor.update(Object.fromEntries(Object.entries(update).map(([path, value]) => [`prototypeToken.${path}`, value])));
+bc53daf8f981  scripts/canvas/rive-config.mjs  [document update]  return app.document.update(update);
+ca2078d68579  scripts/canvas/rive-config.mjs  [document delete]  previews.delete(appId);
+acef1e15d799  scripts/canvas/rive-config.mjs  [file upload / folder]  srcInput.value = await uploadRiv(file);
+e81c1f505e75  scripts/canvas/rive-hud.mjs  [document update]  await doc.update({
+fb3d441a6103  scripts/canvas/rive-hud.mjs  [document delete]  windows.delete(uuid);
+b424f13f77ce  scripts/journal/rive-page-sheet.mjs  [document update]  return this.document.update(update);
+abe955ddb875  scripts/journal/rive-page-sheet.mjs  [document update]  await this.document.update({ "system.inputs": inputs, "system.properties": properties });
+e95e09f8243c  scripts/journal/rive-page-sheet.mjs  [file upload / folder]  const src = await uploadRiv(file);
+87651dab58a7  scripts/journal/rive-page-sheet.mjs  [document update]  await this.document.update({
+f1e536d7aaa9  scripts/riv-wrapper.mjs  [network fetch]  const res = await fetch(src);
+5fa7f825f79b  scripts/riv-wrapper.mjs  [file upload / folder]  export async function uploadRiv(file, { source = "data", dir = uploadRoot() } = {}) {
+b466b410f20d  scripts/riv-wrapper.mjs  [file upload / folder]  await FilePicker.createDirectory(source, parts.slice(0, i).join("/")).catch(() => {});
+42d04cdac101  scripts/riv-wrapper.mjs  [file upload / folder]  const response = await FilePicker.upload(source, dir, wrapped, {}, { notify: false });
+06b11fd5a1d1  scripts/rive-player.mjs  [document delete]  RivePlayer.live.delete(this);
+244eaf238a24  scripts/spikes.mjs  [network fetch]  const res = await fetch(foundry.utils.getRoute(WASM_PATH), { method: "HEAD" });
+a48882f6d1c3  scripts/spikes.mjs  [network fetch]  const bytes = await (await fetch(src)).blob();
+29ae847117bd  scripts/spikes.mjs  [file upload / folder]  result.path = await uploadRiv(file, { dir });
+6796040fe174  scripts/spikes.mjs  [network fetch]  const buffer = await (await fetch(src)).arrayBuffer();
+b4cfbd538ea2  scripts/sync.mjs  [document delete]  player.onDestroy(() => players.get(target)?.delete(player));
+39f095536ba4  scripts/sync.mjs  [socket emit]  game.socket.emit(CHANNEL, { ...message, senderId: game.user.id });
+0a12359aa64a  scripts/sync.mjs  [document delete]  queued.delete(key);
