@@ -1,5 +1,5 @@
 import assert from "./assert.mjs";
-import { _bridgesForTests, releaseBridge, restoreTextures, tick } from "../scripts/canvas/rive-canvas.mjs";
+import { _bridgesForTests, layoutScale, releaseBridge, restoreTextures, tick } from "../scripts/canvas/rive-canvas.mjs";
 
 /**
  * Before our texture is destroyed, the placeable and its mesh must point back at
@@ -122,5 +122,17 @@ tests.push(
     }
     assert.equal(bad.failed, true);
     assert.equal(updated.length, 2);
+  }]
+);
+
+
+tests.push(
+  ["layout fit: the artboard keeps its scene size at every zoom", () => {
+    // A 400-wide tile drawn into a 283-, 400- or 800-pixel source: the artboard is 400 each time.
+    for (const source of [283, 400, 800]) assert.equal(source / layoutScale(source, 400), 400);
+  }],
+  ["layout fit: nonsense sizes fall back to 1", () => {
+    assert.equal(layoutScale(0, 400), 1);
+    assert.equal(layoutScale(400, 0), 1);
   }]
 );

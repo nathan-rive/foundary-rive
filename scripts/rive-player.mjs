@@ -36,6 +36,7 @@ export class RivePlayer {
   #resizeObserver = null;
   #visibilityObserver = null;
   #wantsPlay = false;
+  #naturalRatio = null;
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -47,6 +48,7 @@ export class RivePlayer {
    * @param {string} [options.fit="contain"]   A rive.Fit key, lowercase
    * @param {string} [options.alignment="center"]
    * @param {boolean} [options.autoplay=true]
+   * @param {number} [options.layoutScale=1]  "layout" fit: canvas CSS pixels per artboard unit
    * @returns {Promise<RivePlayer>} resolves once the file has loaded
    */
   static mount(canvas, options) {
@@ -76,11 +78,30 @@ export class RivePlayer {
     return this.#rive;
   }
 
-  /** The loaded artboard's width / height as a CSS aspect-ratio, or null. */
+  /**
+   * The artboard's width / height as designed, as a CSS aspect-ratio, or null.
+   * Captured at load: with the "layout" fit the artboard then takes the canvas's
+   * size, so its live proportions are the stage's, not the file's.
+   */
   get aspectRatio() {
-    const w = this.#rive?.artboardWidth;
-    const h = this.#rive?.artboardHeight;
-    return w > 0 && h > 0 ? `${w} / ${h}` : null;
+    return this.#naturalRatio;
+  }
+
+  /** True with the "layout" fit: the artboard takes the canvas's size instead of being scaled into it. */
+  get isLayoutFit() {
+    return this.#rive?.layout?.fit === globalThis.rive?.Fit?.Layout;
+  }
+
+  /**
+   * Layout fit only: canvas CSS pixels per artboard unit. Sizing the canvas then
+   * (resizeDrawingSurfaceToCanvas) makes the artboard canvas size / scale, so a
+   * file laid out for size, rather than scaled, keeps its elements the same size
+   * and fits more or fewer of them.
+   */
+  setLayoutScale(scale) {
+    const rive = this.#rive;
+    if (!rive || !this.isLayoutFit || !(scale > 0) || rive.layout.layoutScaleFactor === scale) return;
+    rive.layout = rive.layout.copyWith({ layoutScaleFactor: scale });
   }
 
   /** Artboard and state machine names from the loaded file. */
@@ -88,7 +109,7 @@ export class RivePlayer {
     return this.#rive?.contents ?? null;
   }
 
-  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true, offscreen = false }) {
+  async #load(canvas, { src, buffer, artboard, stateMachine, fit = "contain", alignment = "center", autoplay = true, offscreen = false, layoutScale = 1 }) {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
@@ -109,9 +130,12 @@ export class RivePlayer {
         stateMachines: stateMachine,
         autoplay,
         autoBind: true,
-        layout: new Layout({ fit: Fit[capitalize(fit)], alignment: Alignment[camel(alignment)] }),
+        layout: new Layout({ fit: Fit[capitalize(fit)], alignment: Alignment[camel(alignment)], layoutScaleFactor: layoutScale }),
         onLoad: () => {
           if (!this.#rive) return reject(new Error("Rive: player destroyed while loading"));
+          const w = this.#rive.artboardWidth;
+          const h = this.#rive.artboardHeight;
+          this.#naturalRatio = w > 0 && h > 0 ? `${w} / ${h}` : null;
           // Without a named state machine Rive only plays the first timeline; prefer the artboard's first state machine.
           if (!stateMachine) {
             const board = this.#rive.contents?.artboards?.find(a => !artboard || a.name === artboard);

@@ -59,7 +59,8 @@
       "fitWidth": "Fit width",
       "fitHeight": "Fit height",
       "scaleDown": "Scale down",
-      "none": "None"
+      "none": "None",
+      "layout": "Layout (resize the artboard)"
     },
     "Alignment": {
       "top-left": "Top left",

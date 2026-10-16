@@ -145,12 +145,22 @@ export function registerCanvas() {
  * animates token size changes, so the live width/height are mid-animation when
  * our update hook runs. Tokens are sized in grid units, tiles in pixels.
  */
-function pixelSize(placeable) {
+export function pixelSize(placeable) {
   const { width, height } = placeable.document._source;
   if (placeable.document.documentName === "Token") {
     return { width: width * canvas.grid.sizeX, height: height * canvas.grid.sizeY };
   }
   return { width, height };
+}
+
+/**
+ * "layout" fit: source canvas pixels per scene unit, so the artboard is sized in
+ * scene units (a 400×300 tile, or a token's grid size) whatever the zoom. A file
+ * laid out for its artboard size then keeps its elements the same size on the
+ * scene as the tile grows, and fits more of them; zooming only sharpens it.
+ */
+export function layoutScale(sourceWidth, sceneWidth) {
+  return sceneWidth > 0 && sourceWidth > 0 ? sourceWidth / sceneWidth : 1;
 }
 
 /**
@@ -187,6 +197,8 @@ async function rescale(placeable) {
   bridge.rescaleAttempt = attempt;
   bridge.holdUploads = true;
   sizeSource(source, width, height);
+  // Layout fit: same artboard size in scene units, drawn at the new resolution.
+  player.setLayoutScale(layoutScale(width, pixelSize(placeable).width));
   player.rive.resizeDrawingSurfaceToCanvas(1);
   // A paused (off-screen) player waits here until it plays and has drawn again.
   await advancesEvenIfPaused(player, 2);
@@ -250,7 +262,7 @@ async function attach(placeable) {
 
   let player;
   try {
-    player = await RivePlayer.mount(source, { ...settings, offscreen: true });
+    player = await RivePlayer.mount(source, { ...settings, offscreen: true, layoutScale: layoutScale(width, pixelSize(placeable).width) });
   } catch (err) {
     console.error(`${MODULE_ID} | ${doc.documentName} ${placeable.id}:`, err);
     if (bridges.get(placeable) === bridge) bridges.delete(placeable);
@@ -264,6 +276,8 @@ async function attach(placeable) {
   }
 
   bridge.player = player;
+  // Layout fit: size the artboard from the source canvas (see layoutScale).
+  if (player.isLayoutFit) player.rive.resizeDrawingSurfaceToCanvas(1);
   bridge.texture = PIXI.Texture.from(source);
   const markDirty = () => (bridge.dirty = true);
   player.rive.on(globalThis.rive.EventType.Advance, markDirty);
