@@ -1,5 +1,5 @@
 import { MODULE_ID } from "../constants.mjs";
-import { hasDynamicRing, playerFor, riveFlags } from "../canvas/rive-canvas.mjs";
+import { hasDynamicRing, pixelSize, playerFor, riveFlags } from "../canvas/rive-canvas.mjs";
 import { RivePlayer } from "../rive-player.mjs";
 
 /**
@@ -109,6 +109,19 @@ function checkPlayers(check, { tiles, tokens }) {
     }
   }
   check("every Rive tile and token has a player", missing.length === 0, missing.join(", "));
+  // Layout fit: the artboard is the object's size in scene units, whatever the zoom.
+  const offSize = [];
+  for (const placeable of [...tiles, ...tokens]) {
+    const player = playerFor(placeable);
+    if (!player?.isLayoutFit) continue;
+    const want = pixelSize(placeable);
+    const have = { width: player.rive.artboardWidth, height: player.rive.artboardHeight };
+    const close = (a, b) => Math.abs(a - b) <= Math.max(1, b * 0.01);
+    if (!close(have.width, want.width) || !close(have.height, want.height)) {
+      offSize.push(`${placeable.document.documentName} ${placeable.id}: artboard ${Math.round(have.width)}×${Math.round(have.height)}, object ${want.width}×${want.height}`);
+    }
+  }
+  check("layout-fit artboards match their object's size", offSize.length === 0, offSize.join("; "));
   check("no placeable holds a destroyed texture", deadTextures.length === 0, deadTextures.join(", "));
 }
 

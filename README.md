@@ -35,7 +35,7 @@ Write `@Rive[...]` anywhere Foundry enriches text: journal text pages, chat mess
 | --- | --- |
 | `artboard` | Artboard name (default: the file's default) |
 | `sm` | State machine name (default: the artboard's first) |
-| `fit` | `contain`, `cover`, `fill`, `fitWidth`, `fitHeight`, `scaleDown`, `none` |
+| `fit` | `contain`, `cover`, `fill`, `fitWidth`, `fitHeight`, `scaleDown`, `none`, `layout` |
 | `align` | `center`, `top-left`, `top-center`, … `bottom-right` |
 | `ratio` | `auto` (default) or width / height, e.g. `16/9` |
 | `autoplay` | `false` to start paused |
@@ -46,6 +46,8 @@ Quote values that contain spaces.
 ## Rive on scene tiles
 
 Open a tile's configuration and use the **Rive** tab to choose a Rive file, artboard, state machine and fit. The tile's own image stays underneath as a fallback; a tile with no image gets a transparent one so Foundry still draws it. Below the file settings you can set default values for the file's inputs and view model properties, and bind properties to Foundry data (drop a document on the UUID field, then give a data path such as `system.attributes.hp.value`).
+
+**Layout fit:** the other fits scale the artboard into the tile, so a bigger tile shows the same picture bigger (or stretched). **Layout (resize the artboard)** instead makes the artboard the tile's size in scene units (a token's: its size in grid squares times the grid size), as when you resize the artboard in the Rive editor. A file laid out for its size, with Rive layouts or a script that fills the artboard, then keeps its elements the same size on the scene and fits more of them as the tile grows; zooming in only makes it sharper. On journal pages and inline embeds (`fit=layout`) the artboard takes the size of its box in screen pixels; with the aspect ratio on **auto**, the box keeps the artboard's designed proportions.
 
 As GM, the tile's HUD has a Rive button that opens live controls: changes play on the tile for everyone viewing the scene, and **Save current values as defaults** stores them on the tile.
 
