@@ -66,11 +66,14 @@ async function attach(tile) {
 
   bridge.player = player;
   bridge.texture = PIXI.Texture.from(offscreen);
+  // EventType.Draw never fires in @rive-app/canvas 2.44, and Advance fires every
+  // frame while playing, settled or not; the runtime exposes no "pixels changed"
+  // signal. So a playing tile re-uploads every frame Rive advances (worst case).
   const onDraw = () => {
     bridge.dirty = true;
     stats.draws++;
   };
-  player.rive.on(globalThis.rive.EventType.Draw, onDraw);
+  player.rive.on(globalThis.rive.EventType.Advance, onDraw);
   const upload = () => {
     if (!bridge.dirty) return;
     bridge.dirty = false;
@@ -82,7 +85,7 @@ async function attach(tile) {
   canvas.app.ticker.add(upload, null, PIXI.UPDATE_PRIORITY.HIGH);
   bridge.stopListening = () => {
     canvas.app?.ticker?.remove(upload);
-    player.rive?.off(globalThis.rive.EventType.Draw, onDraw);
+    player.rive?.off(globalThis.rive.EventType.Advance, onDraw);
   };
 
   tile.texture = bridge.texture;
@@ -121,6 +124,17 @@ export async function spawn(count, { src = "rive-spike/vehicles.riv.json", size 
   return scene.createEmbeddedDocuments("Tile", data);
 }
 
+/** Fires every spike tile's first trigger input repeatedly, so the art keeps moving. */
+export function agitate(everyMs = 400) {
+  const id = setInterval(() => {
+    for (const { player } of bridges.values()) {
+      const sm = player?.rive?.playingStateMachineNames?.[0];
+      player?.rive?.stateMachineInputs(sm)?.find(i => i.type === 58)?.fire();
+    }
+  }, everyMs);
+  return () => clearInterval(id);
+}
+
 /** Removes every tile the spike created on the viewed scene. */
 export async function clear() {
   const ids = canvas.scene.tiles.filter(t => t.getFlag(MODULE_ID, SPIKE_FLAG)).map(t => t.id);
@@ -149,10 +163,26 @@ export async function measure(seconds = 5) {
     last = now;
   };
   app.ticker.add(tick);
+  // Time each Rive instance's per-frame draw (advance + rasterize into its canvas).
+  let riveMs = 0;
+  const unwrap = [];
+  for (const { player } of bridges.values()) {
+    const r = player?.rive;
+    if (!r) continue;
+    const original = r.draw;
+    r.draw = function (...args) {
+      const t0 = performance.now();
+      const out = original.apply(this, args);
+      riveMs += performance.now() - t0;
+      return out;
+    };
+    unwrap.push(() => (r.draw = original));
+  }
   Object.assign(stats, { uploads: 0, uploadMs: 0, draws: 0 });
   await new Promise(r => setTimeout(r, seconds * 1000));
   app.ticker.remove(tick);
   app.renderer.render = originalRender;
+  unwrap.forEach(u => u());
 
   const sorted = [...frames].sort((a, b) => a - b);
   const avg = list => list.reduce((s, x) => s + x, 0) / Math.max(1, list.length);
@@ -162,9 +192,10 @@ export async function measure(seconds = 5) {
     fps: +(1000 / avg(frames)).toFixed(1),
     frameMsP95: +(sorted[Math.floor(sorted.length * 0.95)] ?? 0).toFixed(1),
     renderMsAvg: +avg(renders).toFixed(2),
-    riveDrawsPerSec: +(stats.draws / seconds).toFixed(1),
+    riveAdvancesPerSec: +(stats.draws / seconds).toFixed(1),
     uploadsPerSec: +(stats.uploads / seconds).toFixed(1),
     uploadMsPerFrame: +(stats.uploadMs / Math.max(1, frames.length)).toFixed(3),
+    riveDrawMsPerFrame: +(riveMs / Math.max(1, frames.length)).toFixed(2),
     visible: document.visibilityState,
     maxFPS: canvas.app.ticker.maxFPS
   };
