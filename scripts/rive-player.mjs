@@ -1,5 +1,6 @@
 import { MAX_LIVE_PLAYERS } from "./constants.mjs";
 import { fetchWrapped, isWrappedPath } from "./riv-wrapper.mjs";
+import { takeRefusedScripts } from "./runtime-log.mjs";
 
 /**
  * Thin, framework-agnostic wrapper around one Rive instance on one canvas.
@@ -36,6 +37,8 @@ export class RivePlayer {
   #resizeObserver = null;
   #visibilityObserver = null;
   #wantsPlay = false;
+  #refusedScripts = [];
+  #source = "";
 
   /**
    * @param {HTMLCanvasElement} canvas
@@ -83,6 +86,15 @@ export class RivePlayer {
     return w > 0 && h > 0 ? `${w} / ${h}` : null;
   }
 
+  /**
+   * Scripts in the file that the runtime refused to run (unsigned; see the
+   * README's Known limitations). Anything they draw or drive doesn't happen.
+   * @type {string[]}
+   */
+  get refusedScripts() {
+    return this.#refusedScripts;
+  }
+
   /** Artboard and state machine names from the loaded file. */
   get contents() {
     return this.#rive?.contents ?? null;
@@ -92,6 +104,7 @@ export class RivePlayer {
     const { Rive, Layout, Fit, Alignment } = globalThis.rive;
     this.#canvas = canvas;
     this.#wantsPlay = autoplay;
+    this.#source = src ?? "a Rive file";
     // Foundry paths like "rive/world/x.riv.json" need the route prefix; URLs pass through.
     if (src && !/^([a-z][a-z\d+.-]*:|\/)/i.test(src)) src = foundry.utils.getRoute(src);
     // Uploaded files arrive as .riv.json wrappers (see riv-wrapper.mjs).
@@ -111,6 +124,11 @@ export class RivePlayer {
         autoBind: true,
         layout: new Layout({ fit: Fit[capitalize(fit)], alignment: Alignment[camel(alignment)] }),
         onLoad: () => {
+          // First: the runtime printed these for this file just before calling us.
+          this.#refusedScripts = takeRefusedScripts();
+          if (this.#refusedScripts.length) {
+            console.warn(`Rive for Foundry | ${this.#source}: the Rive runtime refused unsigned script(s) ${this.#refusedScripts.map(n => `"${n}"`).join(", ")}; whatever they draw or drive won't happen. Export or publish the file signed from Rive.`);
+          }
           if (!this.#rive) return reject(new Error("Rive: player destroyed while loading"));
           // Without a named state machine Rive only plays the first timeline; prefer the artboard's first state machine.
           if (!stateMachine) {

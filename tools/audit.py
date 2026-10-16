@@ -52,8 +52,8 @@ PATTERNS = [
      ["Hooks.on(`draw${kind}`, fn)", "Hooks.on(\"canvasTearDown\", fn)", "Hooks.once('canvasReady', fn)"]),
     ("client: sheet / HUD render hook", r"Hooks\.(on|once)\(\s*[\"'`]render", ["Hooks.on(`render${sheet}`, fn)", "Hooks.on(\"renderTokenHUD\", fn)"]),
     ("client: canvas ticker", r"ticker\.(add|remove)\s*\(", ["canvas.app.ticker.add(tick)"]),
-    ("client: core patch", r"\.prototype\.\w+\s*=(?!=)|\blibWrapper\b|Object\.defineProperty\(\s*(globalThis|window|CONFIG|foundry|PIXI|canvas)\b",
-     ["Tile.prototype.draw = fn", "libWrapper.register(a)", "Object.defineProperty(CONFIG, 'x', {})"]),
+    ("client: core patch", r"\.prototype\.\w+\s*=(?!=)|\blibWrapper\b|Object\.defineProperty\(\s*(globalThis|window|CONFIG|foundry|PIXI|canvas)\b|\b(console|window|globalThis)\.\w+\s*=(?!=)",
+     ["Tile.prototype.draw = fn", "libWrapper.register(a)", "Object.defineProperty(CONFIG, 'x', {})", "console.error = tee", "window.foo = 1", "globalThis.bar = x"]),
     ("client: page-level DOM", r"document\.body\.(append|prepend|insertBefore|appendChild)|\bhost\(\)\.append",
      ["document.body.append(el)", "host().append(source)"]),
 ]

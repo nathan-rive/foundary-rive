@@ -49,7 +49,7 @@ Foundry's canvas, sheets and hooks are shared with core and every other module. 
 3. **Leave core state as you found it.** Don't set `renderable`, `visible`, `eventMode`, `hitArea` or similar on Foundry's objects, only on our own. The core properties we do replace (a placeable's `texture` and its mesh's `texture`) are restored on detach.
 4. **Lifecycle hooks are idempotent.** Redraws, scene changes and resizes, a hook firing twice or out of order, must not leave stale bridges, players, tickers or listeners.
 5. **Sheets and HUDs: add, don't rearrange.** Add only our own nav item and tab (placed by `findTabSlot`) or HUD button; never move, remove or re-render other elements. If there's no safe place, add nothing.
-6. **No patches of core classes** (`prototype` assignments, libWrapper, redefined globals) without the user's approval.
+6. **No patches of core classes** (`prototype` assignments, libWrapper, redefined globals) without the user's approval. Approved so far, both passing every message on and restoring `console.error` only if it's still theirs: `runtime-log.mjs` tees `console.error` while the Rive runtime starts (the runtime keeps the tee, to report refused scripts), and the health check captures it for the length of a check.
 7. **Page-level DOM** is only our own hidden host and datalists, created once with fixed ids.
 8. **Health check before handing over.** Every test build passes the in-world health check (below) before it goes to the user, and every release before it ships.
 

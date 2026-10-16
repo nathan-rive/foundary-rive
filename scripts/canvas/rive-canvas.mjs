@@ -2,6 +2,7 @@ import { MODULE_ID } from "../constants.mjs";
 import { RivePlayer } from "../rive-player.mjs";
 import { applyInitialState, bindProperties } from "../state.mjs";
 import * as sync from "../sync.mjs";
+import { notifyRefusedScripts } from "../notices.mjs";
 
 /**
  * Rive on scene Tiles and Tokens.
@@ -264,6 +265,7 @@ async function attach(placeable) {
   }
 
   bridge.player = player;
+  notifyRefusedScripts(player, settings.src);
   bridge.texture = PIXI.Texture.from(source);
   const markDirty = () => (bridge.dirty = true);
   player.rive.on(globalThis.rive.EventType.Advance, markDirty);

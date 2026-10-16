@@ -5,6 +5,7 @@ import { FITS } from "../journal/rive-page-model.mjs";
 import { renderDefaultsEditor } from "../live-controls.mjs";
 import { hasDynamicRing, riveState } from "./rive-canvas.mjs";
 import { findTabSlot } from "./tab-slot.mjs";
+import { refusedScriptsText } from "../notices.mjs";
 
 /**
  * Adds a "Rive" tab to the v12 (AppV1) Tile and Token config sheets (including a
@@ -198,7 +199,7 @@ async function loadPreview(app, src, tab, status) {
   // The sheet closed or re-rendered while we loaded.
   if (!tab.isConnected) return player.destroy();
   previews.set(app.id, player);
-  status.textContent = "";
+  status.textContent = refusedScriptsText(player);
 
   const boards = player.contents?.artboards ?? [];
   artboards.append(...boards.map(a => new Option(a.name, a.name)));

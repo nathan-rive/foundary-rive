@@ -75,6 +75,7 @@
     "BindActorShorthand": "This token's actor",
     "BindTokenShorthand": "This token",
     "LiveBoundHidden": "Bound values aren't shown here; they follow their data.",
-    "LiveAllBound": "Every value in this file is bound to data, so there's nothing to change live."
+    "LiveAllBound": "Every value in this file is bound to data, so there's nothing to change live.",
+    "ScriptsRefused": "This file's script(s) {names} didn't run: Rive only runs signed scripts on the web. Export or publish the file signed from Rive; until then, whatever they draw or drive won't show."
   }
 }
