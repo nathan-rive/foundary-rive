@@ -44,6 +44,15 @@ async function attach(tile) {
   const offscreen = document.createElement("canvas");
   offscreen.width = Math.max(1, Math.round(width * scale));
   offscreen.height = Math.max(1, Math.round(height * scale));
+  // The runtime only draws into canvases that are in the page with a real size
+  // (a detached canvas advances but never renders). Keep it laid out, invisible,
+  // behind everything.
+  Object.assign(offscreen.style, {
+    position: "fixed", left: "0px", top: "0px",
+    width: `${offscreen.width}px`, height: `${offscreen.height}px`,
+    opacity: "0", pointerEvents: "none", zIndex: "-1"
+  });
+  hostElement().append(offscreen);
 
   const bridge = { player: null, texture: null, offscreen, dirty: false, stopListening: null };
   bridges.set(tile.id, bridge);
@@ -59,10 +68,14 @@ async function attach(tile) {
   } catch (err) {
     console.error(`${MODULE_ID} | tile ${tile.id}:`, err);
     bridges.delete(tile.id);
+    offscreen.remove();
     return;
   }
   // The tile may have been redrawn or deleted while we loaded.
-  if (bridges.get(tile.id) !== bridge || tile.destroyed || !tile.mesh) return player.destroy();
+  if (bridges.get(tile.id) !== bridge || tile.destroyed || !tile.mesh) {
+    offscreen.remove();
+    return player.destroy();
+  }
 
   bridge.player = player;
   bridge.texture = PIXI.Texture.from(offscreen);
@@ -100,6 +113,18 @@ function detach(id) {
   bridge.stopListening?.();
   bridge.player?.destroy();
   bridge.texture?.destroy(true);
+  bridge.offscreen.remove();
+}
+
+function hostElement() {
+  let host = document.getElementById(`${MODULE_ID}-tile-sources`);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = `${MODULE_ID}-tile-sources`;
+    host.setAttribute("aria-hidden", "true");
+    document.body.append(host);
+  }
+  return host;
 }
 
 /* -------------------------------------------- */
