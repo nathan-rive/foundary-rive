@@ -77,7 +77,12 @@ export function playerFor(placeable) {
 /** What `@actor` in a binding means for this placeable: a token's own actor (linked or not). */
 export function bindingContext(placeable) {
   if (placeable?.document?.documentName !== "Token") return {};
-  return { actor: placeable.actor ?? placeable.document.actor ?? null };
+  // A getter: Foundry can replace a token's synthetic actor object, so resolve it each time.
+  return {
+    get actor() {
+      return placeable.document.actor ?? null;
+    }
+  };
 }
 
 export function registerCanvas() {

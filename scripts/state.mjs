@@ -94,14 +94,21 @@ export function bindProperties(player, bindings = [], { applyNow = true, context
       console.warn(`foundry-rive | binding for "${name}": no document ${uuid}`);
       continue;
     }
-    // A token's unlinked actor is a synthetic document with its own UUID; match on that.
-    const docUuid = doc.uuid;
+    // A token's unlinked actor is a synthetic document with its own UUID. It also
+    // inherits from its base actor, and a base-actor change fires the hook for the
+    // base actor only, so watch both and always read through the (current) synthetic.
+    const watched = new Set([doc.uuid]);
+    if (doc.isToken) {
+      const base = game.actors.get(doc.id);
+      if (base) watched.add(base.uuid);
+    }
     let last = foundry.utils.getProperty(doc, path);
     if (applyNow) setProperty(player, name, last);
     const hook = `update${doc.documentName}`;
     const id = Hooks.on(hook, updated => {
-      if (updated.uuid !== docUuid) return;
-      const value = foundry.utils.getProperty(updated, path);
+      if (!watched.has(updated.uuid)) return;
+      const current = resolveBinding(uuid, context) ?? doc;
+      const value = foundry.utils.getProperty(current, path);
       if (value === last) return;
       last = value;
       setProperty(player, name, value);
