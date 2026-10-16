@@ -27,8 +27,14 @@ import * as sync from "../sync.mjs";
 /** Shipped 1 px transparent image for Rive tiles that have no image of their own. */
 export const FALLBACK_IMAGE = `modules/${MODULE_ID}/assets/transparent.png`;
 
-/** Longest side of a source canvas, in pixels. Bounds per-placeable cost. */
-const MAX_TEXTURE_SIDE = 512;
+/** Longest side of a source canvas, in pixels. Bounds per-placeable cost at high zoom. */
+const MAX_TEXTURE_SIDE = 2048;
+
+/** Shortest side a source canvas shrinks to when zoomed far out. */
+const MIN_TEXTURE_SIDE = 32;
+
+/** Wait for zooming to settle before re-rendering sources at the new resolution. */
+const RESIZE_DEBOUNCE_MS = 200;
 
 /** How often to re-check which placeables are on screen. */
 const VISIBILITY_INTERVAL_MS = 250;
@@ -119,6 +125,12 @@ export function registerCanvas() {
     if (riveFlags(merged) && !merged.texture?.src) foundry.utils.setProperty(changes, "texture.src", FALLBACK_IMAGE);
   });
   Hooks.on("canvasTearDown", () => [...bridges.keys()].forEach(detach));
+  // Rive is vector art: when the zoom changes, re-render sources at the resolution
+  // they are actually shown at, rather than stretching a fixed-size texture.
+  const rescaleAll = foundry.utils.debounce(() => {
+    for (const placeable of bridges.keys()) rescale(placeable);
+  }, RESIZE_DEBOUNCE_MS);
+  Hooks.on("canvasPan", rescaleAll);
   Hooks.on("canvasReady", () => {
     canvas.app.ticker.remove(tick);
     canvas.app.ticker.add(tick, null, PIXI.UPDATE_PRIORITY.HIGH);
@@ -138,20 +150,58 @@ function pixelSize(placeable) {
   return { width, height };
 }
 
+/**
+ * Source canvas size for a placeable at the current view: its scene size times
+ * the canvas zoom and the display's pixel ratio, so it matches the screen pixels
+ * it covers. The scale moves in steps of √2 so small zoom changes don't trigger a
+ * re-render, and the longest side stays within MIN/MAX_TEXTURE_SIDE.
+ */
+function sourceSize(placeable) {
+  const { width, height } = pixelSize(placeable);
+  const shown = (canvas.stage?.scale?.x || 1) * (canvas.app?.renderer?.resolution || 1);
+  let scale = Math.SQRT2 ** Math.ceil(Math.log(shown) / Math.log(Math.SQRT2));
+  const longest = Math.max(width, height) * scale;
+  if (longest > MAX_TEXTURE_SIDE) scale *= MAX_TEXTURE_SIDE / longest;
+  else if (longest < MIN_TEXTURE_SIDE) scale *= MIN_TEXTURE_SIDE / longest;
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+/** Re-renders a placeable's source at the size its current view needs, if that changed. */
+function rescale(placeable) {
+  const bridge = bridges.get(placeable);
+  if (!bridge?.player?.rive || !bridge.texture) return;
+  const { width, height } = sourceSize(placeable);
+  const { source } = bridge;
+  if (source.width === width && source.height === height) return;
+  sizeSource(source, width, height);
+  bridge.player.rive.resizeDrawingSurfaceToCanvas(1);
+  const base = bridge.texture.baseTexture;
+  base.resource.resize(width, height);
+  base.setRealSize(width, height);
+  base.update();
+  bridge.dirty = true;
+  placeable.renderFlags.set({ refreshMesh: true });
+}
+
+/** Sets a source canvas's pixel size and matching CSS size (Rive reads both). */
+function sizeSource(source, width, height) {
+  source.width = width;
+  source.height = height;
+  source.style.width = `${width}px`;
+  source.style.height = `${height}px`;
+}
+
 async function attach(placeable) {
   detach(placeable);
   const doc = placeable.document;
   const settings = riveFlags(doc);
   if (!settings || !placeable.mesh || hasDynamicRing(doc)) return;
 
-  const { width, height } = pixelSize(placeable);
-  const scale = Math.min(1, MAX_TEXTURE_SIDE / Math.max(width, height));
+  const { width, height } = sourceSize(placeable);
   const source = document.createElement("canvas");
-  source.width = Math.max(1, Math.round(width * scale));
-  source.height = Math.max(1, Math.round(height * scale));
+  sizeSource(source, width, height);
   Object.assign(source.style, {
     position: "fixed", left: "0px", top: "0px",
-    width: `${source.width}px`, height: `${source.height}px`,
     opacity: "0", pointerEvents: "none", zIndex: "-1"
   });
   host().append(source);
