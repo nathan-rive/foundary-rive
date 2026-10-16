@@ -14,28 +14,44 @@ import { renderStateEditor, showValue } from "./journal/state-editor.mjs";
  * @param {(changes: {inputs?: object[], properties?: object[], bindings?: object[]}) => Promise} save
  */
 export function renderDefaultsEditor(container, player, { inputs = [], properties = [], bindings = [] }, save) {
-  const listKey = kind => (kind === "input" ? "inputs" : "properties");
-  const lists = { inputs, properties };
+  const edits = defaultsEdits({ inputs, properties, bindings }, save);
   renderStateEditor(container, player, {
     values: {
       input: new Map(inputs.map(e => [e.name, e.value])),
       property: new Map(properties.map(e => [e.name, e.value]))
     },
-    onChange: (kind, name, value) => {
-      const next = lists[listKey(kind)].filter(e => e.name !== name);
-      if (value !== null) next.push({ name, value: String(value) });
-      return save({ [listKey(kind)]: next });
-    },
+    onChange: edits.setValue,
     onFire: (kind, name) => (kind === "input" ? fireInput(player, name) : setProperty(player, name, true)),
-    bindings: {
-      list: bindings,
-      onChange: (name, binding) => {
-        const next = bindings.filter(b => b.name !== name);
-        if (binding.uuid || binding.path) next.push({ name, ...binding });
-        return save({ bindings: next });
-      }
-    }
+    bindings: { list: bindings, onChange: edits.setBinding }
   });
+}
+
+/**
+ * Keeps the editor's own copy of the stored lists and saves the whole changed
+ * list on each edit. The caller may save without re-rendering (tile and token
+ * sheets do), so building on the lists it passed in would let a second edit
+ * undo the first.
+ */
+export function defaultsEdits({ inputs = [], properties = [], bindings = [] }, save) {
+  const lists = { inputs: [...inputs], properties: [...properties], bindings: [...bindings] };
+  const commit = (key, next) => {
+    lists[key] = next;
+    return save({ [key]: next });
+  };
+  return {
+    /** value null removes the stored default ("reset"). */
+    setValue(kind, name, value) {
+      const key = kind === "input" ? "inputs" : "properties";
+      const next = lists[key].filter(e => e.name !== name);
+      if (value !== null) next.push({ name, value: String(value) });
+      return commit(key, next);
+    },
+    setBinding(name, binding) {
+      const next = lists.bindings.filter(b => b.name !== name);
+      if (binding.uuid || binding.path) next.push({ name, ...binding });
+      return commit("bindings", next);
+    }
+  };
 }
 
 /** Names of properties that are bound to Foundry data (a binding with both a document and a path). */
