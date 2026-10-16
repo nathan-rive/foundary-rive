@@ -137,10 +137,13 @@ With [Monk's Active Tile Triggers](https://foundryvtt.com/packages/monks-active-
 
 - **Set Rive value**: sets a view model property or state machine input on the chosen tiles or tokens (**This Tile** by default, or the triggering token, tiles within the area, the previous action's entities, or Tagger tags). The value can be text, a number, `true`/`false`, a color (hex or CSS name) or an enum option, and MATT's `{{token.name}}`-style values and `[[1d6]]` rolls work too. Tick **Remember** to also save it as that tile's or token's default, so it stays after everyone reloads; without it, the value lasts as long as a GM stays connected, like the GM live controls.
 - **Fire Rive trigger**: fires a trigger property or trigger input once, for everyone viewing the scene right now.
+- **Get Rive value**: reads a property or input so later actions can branch on it. The value is stored as `rive.<name>` (or the name you give in **Save as**): use it in MATT's **Check value** filter (Value Name `rive.sprung`, with Goto landing on fail) or in text as `{{value.rive.sprung}}`. Compare numbers as usual (`> 3`), text in quotes (`"Open"`), and for `true`/`false` check `true` and send `false` to the fail landing. It reads what the GM's client is drawing when the GM is on that scene (including changes the file's own state machine made); otherwise the property's bound data, live value or saved default, and nothing for a value only the file itself defines.
 
 Names are the ones listed on the tile's or token's **Rive** tab. Actions run on the GM's client (MATT sends players' triggers to the GM), so a GM must be connected. Properties bound to data are left alone; they keep following their data.
 
 A walk-over trap, for example: give a Rive tile a boolean property `sprung` that the file's state machine animates, then in the tile's MATT config add an **Enter** trigger with **Set Rive value** → `sprung` = `true`, **Remember** ticked. For a one-off effect, use **Fire Rive trigger** on a trigger property instead.
+
+To spring a trap only once, give the tile these actions in order: **Get Rive value** `sprung`; **Check value** with Value Name `rive.sprung`, value `true` and Goto landing on fail `arm`; a **Landing** named `arm` (with Stop when reached in code ticked, the default); then **Set Rive value** and **Fire Rive trigger**. While the trap is unsprung the check fails and jumps past the landing to spring it; once sprung, the check passes and the flow stops at the landing.
 
 ## Known limitations
 

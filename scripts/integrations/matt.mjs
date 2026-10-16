@@ -1,13 +1,15 @@
 import { MODULE_ID } from "../constants.mjs";
-import { riveFlags, riveState } from "../canvas/rive-canvas.mjs";
+import { playerFor, riveFlags, riveState } from "../canvas/rive-canvas.mjs";
 import { boundPropertyNames } from "../live-controls.mjs";
+import { describe, readBinding, resolveBinding } from "../state.mjs";
 import * as sync from "../sync.mjs";
 
 /**
  * Optional integration with Monk's Active Tile Triggers (MATT, v12 = 12.x).
  * Adds a "Rive" group of tile actions, so a tile's triggers (a token walking
  * onto it, a click, combat turns...) can set Rive values and fire Rive
- * triggers on tiles and tokens, for everyone on the scene.
+ * triggers on tiles and tokens, for everyone on the scene, and read values
+ * back for MATT's own checks and branches.
  *
  * Nothing here runs unless MATT is active: it calls `setupTileActions` from
  * its own init, and that is the only entry point. MATT runs tile actions on the
@@ -18,6 +20,9 @@ import * as sync from "../sync.mjs";
 export const MATT_ID = "monks-active-tiles";
 export const ACTION_SET = "set";
 export const ACTION_FIRE = "fire";
+export const ACTION_GET = "get";
+/** Where Get Rive value puts what it read in MATT's action values: `value.rive.<variable>`. */
+export const VALUE_KEY = "rive";
 
 /** Registers the hook MATT calls; must run before MATT's init (module evaluation is). */
 export function registerMattIntegration() {
@@ -33,6 +38,7 @@ export function registerActions(app) {
   app.registerTileGroup(MODULE_ID, "FOUNDRY_RIVE.Matt.Group");
   app.registerTileAction(MODULE_ID, ACTION_SET, setAction(app));
   app.registerTileAction(MODULE_ID, ACTION_FIRE, fireAction(app));
+  app.registerTileAction(MODULE_ID, ACTION_GET, getAction(app));
   return true;
 }
 
@@ -118,6 +124,83 @@ function fireAction(app) {
       return game.i18n.format("FOUNDRY_RIVE.Matt.FireText", { name: esc(action.data?.name), entity: entityName });
     }
   };
+}
+
+function getAction(app) {
+  return {
+    name: "FOUNDRY_RIVE.Matt.GetAction",
+    requiresGM: true,
+    ctrls: [
+      entityCtrl,
+      kindCtrl,
+      nameCtrl("FOUNDRY_RIVE.Matt.NameHelp"),
+      withHelp({ id: "variable", name: "FOUNDRY_RIVE.Matt.Variable", type: "text" }, "FOUNDRY_RIVE.Matt.VariableHelp")
+    ],
+    values: { kind: kindValues },
+    fn: async (args = {}) => {
+      const { action } = args;
+      const name = String(action?.data?.name ?? "").trim();
+      if (!name) return;
+      const variable = String(action.data.variable ?? "").trim() || name;
+      for (const entity of await app.getEntities(args, "tiles")) {
+        const doc = docOf(entity);
+        if (!isRiveDoc(doc)) continue;
+        // Merged into MATT's action values, so later actions can use
+        // `rive.<variable>` (Check Value) or {{value.rive.<variable>}}.
+        return { [VALUE_KEY]: { [variable]: readRiveValue(doc, kindOf(action), name) } };
+      }
+    },
+    content: async (trigger, action) => {
+      const entityName = await app.entityName(action.data?.entity || "tile", "tiles");
+      const name = String(action.data?.name ?? "");
+      return game.i18n.format("FOUNDRY_RIVE.Matt.GetText", {
+        name: esc(name),
+        variable: esc(`${VALUE_KEY}.${String(action.data?.variable ?? "").trim() || name}`),
+        entity: entityName
+      });
+    }
+  };
+}
+
+/**
+ * The current value of a Rive input or view model property on a tile or token,
+ * as the GM's client knows it. If this client is drawing it (the GM is on that
+ * scene), the player's own value: that includes changes the file's state
+ * machine made by itself. Otherwise the value it starts from everywhere: bound
+ * data, else the live value, else the stored default; a value only the file
+ * itself defines is unknown (null) until the scene is viewed.
+ * Booleans and numbers come back as such, so MATT can compare them.
+ */
+export function readRiveValue(doc, kind, name) {
+  if (!isRiveDoc(doc)) return null;
+  const player = doc.object ? playerFor(doc.object) : null;
+  if (player?.rive) {
+    const described = describe(player);
+    const entry = (kind === "input" ? described.inputs : described.properties).find(e => e.name === name);
+    if (entry) return entry.value ?? null;
+  }
+  const state = riveState(doc);
+  if (kind === "property") {
+    const binding = state.bindings.find(b => b.name === name && b.uuid && b.path);
+    if (binding) {
+      const context = doc.documentName === "Token" ? { token: doc, actor: doc.actor ?? null } : {};
+      const source = resolveBinding(binding.uuid, context);
+      if (source) return readBinding(source, binding.path) ?? null;
+    }
+  }
+  const live = sync.knownValues(doc.uuid)[kind];
+  if (live.has(name)) return typed(live.get(name));
+  const stored = state[kind === "input" ? "inputs" : "properties"].find(e => e.name === name);
+  return stored ? typed(stored.value) : null;
+}
+
+/** Stored and live values are text; give MATT booleans and numbers back. */
+function typed(value) {
+  if (typeof value !== "string") return value ?? null;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  const n = Number(value);
+  return value.trim() !== "" && Number.isFinite(n) ? n : value;
 }
 
 /**
