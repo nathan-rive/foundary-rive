@@ -65,6 +65,63 @@ A binding's path can be a data path or a condition:
 
 The path field suggests a `status:` entry for each condition. Bindings follow condition changes (Active Effects added, changed or removed, including ones from items) as well as actor and token updates, and an unlinked token follows its base actor where it doesn't override it.
 
+### Common bindings
+
+Bind each value to a Rive view model property of the matching type: **number** for counts and scores, **boolean** for `status:` paths and yes/no fields, **string** for text. Paths are case-sensitive.
+
+**Any system: the token itself (document `@token`)**
+
+| Path | Type | What it is |
+| --- | --- | --- |
+| `name` | string | The token's name |
+| `hidden` | boolean | Hidden from players by the GM |
+| `elevation` | number | Elevation, in the scene's distance units |
+| `disposition` | number | −2 secret, −1 hostile, 0 neutral, 1 friendly |
+| `rotation` | number | Facing, in degrees |
+| `alpha` | number | Opacity, 0 to 1 |
+| `width`, `height` | number | Size in grid squares |
+| `actorLink` | boolean | Linked to its actor (one shared character) or unlinked (a copy per token) |
+
+**Any system using Foundry's built-in conditions (document `@actor`), e.g. Simple Worldbuilding**
+
+`status:dead`, `status:unconscious`, `status:sleep`, `status:stun`, `status:prone`, `status:restrain`, `status:paralysis`, `status:fly`, `status:blind`, `status:deaf`, `status:silence`, `status:fear`, `status:burning`, `status:frozen`, `status:shock`, `status:corrode`, `status:bleeding`, `status:disease`, `status:poison`, `status:curse`, `status:regen`, `status:degen`, `status:hover`, `status:burrow`, `status:upgrade` (Empowered), `status:downgrade` (Weakened), `status:invisible`, `status:target`, `status:eye` (Marked), `status:bless`, `status:fireShield`, `status:coldShield`, `status:magicShield`, `status:holyShield`. Each is `true` while the condition is on the token.
+
+**D&D 5e (dnd5e 4.x, document `@actor`)**
+
+| Path | Type | What it is |
+| --- | --- | --- |
+| `system.attributes.hp.value` | number | Current hit points |
+| `system.attributes.hp.max` | number | Maximum hit points |
+| `system.attributes.hp.temp` | number | Temporary hit points |
+| `system.attributes.ac.value` | number | Armor Class |
+| `system.attributes.death.success` | number | Death save successes (0–3) |
+| `system.attributes.death.failure` | number | Death save failures (0–3) |
+| `system.attributes.exhaustion` | number | Exhaustion level (0–6) |
+| `system.attributes.inspiration` | boolean | Has Heroic Inspiration (characters) |
+| `system.attributes.movement.walk` | number | Walking speed |
+| `system.attributes.spell.dc` | number | Spell save DC |
+| `system.abilities.str.value` | number | Strength score (also `dex`, `con`, `int`, `wis`, `cha`) |
+| `system.abilities.str.mod` | number | Strength modifier (same abilities) |
+| `system.details.level` | number | Character level (characters) |
+| `system.details.cr` | number | Challenge rating (NPCs) |
+| `system.resources.primary.value` | number | First tracked resource (also `secondary`, `tertiary`) |
+| `system.spells.spell1.value` | number | Remaining 1st-level spell slots (`spell2` … `spell9`) |
+| `system.currency.gp` | number | Gold pieces (also `cp`, `sp`, `ep`, `pp`) |
+
+Conditions (`status:<id>`, boolean): `blinded`, `charmed`, `deafened`, `exhaustion`, `frightened`, `grappled`, `incapacitated`, `invisible`, `paralyzed`, `petrified`, `poisoned`, `prone`, `restrained`, `stunned`, `unconscious`, plus `bleeding`, `burning`, `cursed`, `diseased`, `silenced`, `surprised`, `transformed`. Other dnd5e states are also statuses: `dead`, `concentrating`, `dodging`, `hiding`, `flying`, `hovering`, `burrowing`, `ethereal`, `sleeping`, `stable`, `marked`, and cover (`coverHalf`, `coverThreeQuarters`, `coverTotal`).
+
+**Simple Worldbuilding (document `@actor`)**
+
+| Path | Type | What it is |
+| --- | --- | --- |
+| `system.health.value`, `system.health.max` | number | Health |
+| `system.power.value`, `system.power.max` | number | Power |
+| `system.attributes.<key>.value` | varies | Any custom attribute you defined |
+
+Other systems keep their data under `system.*` with their own names; open an actor's data in the browser console (`game.actors.getName("Name").system`) to find a path.
+
+Values that a system calculates from owned items (in dnd5e, for example AC from equipped armor, or level from class items) refresh when the actor or one of its effects next changes, not at the moment an item is equipped.
+
 Two client settings help on slower machines: **Rive tile frame rate** (full, 30 or 15 fps) and **Maximum Rive players**.
 
 ## Known limitations
