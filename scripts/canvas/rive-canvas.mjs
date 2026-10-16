@@ -125,10 +125,17 @@ export function registerCanvas() {
   });
 }
 
-/** Pixel size of a placeable: tokens size by the grid (getSize), tiles are in pixels. */
+/**
+ * Target pixel size of a placeable, from its stored (not animated) data: Foundry
+ * animates token size changes, so the live width/height are mid-animation when
+ * our update hook runs. Tokens are sized in grid units, tiles in pixels.
+ */
 function pixelSize(placeable) {
-  if (typeof placeable.getSize === "function") return placeable.getSize();
-  return { width: placeable.document.width, height: placeable.document.height };
+  const { width, height } = placeable.document._source;
+  if (placeable.document.documentName === "Token") {
+    return { width: width * canvas.grid.sizeX, height: height * canvas.grid.sizeY };
+  }
+  return { width, height };
 }
 
 async function attach(placeable) {
