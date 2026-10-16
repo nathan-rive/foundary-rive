@@ -9,6 +9,7 @@ import * as sync from "./sync.mjs";
 import * as riveCanvas from "./canvas/rive-canvas.mjs";
 import { registerRiveConfig } from "./canvas/rive-config.mjs";
 import { registerRiveHud } from "./canvas/rive-hud.mjs";
+import { startRuntime } from "./runtime-log.mjs";
 import { healthCheck } from "./dev/health-check.mjs";
 
 /** The JournalEntryPage sub-type declared in module.json, prefixed with the module id. */
@@ -17,6 +18,9 @@ export const PAGE_TYPE = `${MODULE_ID}.rive`;
 Hooks.once("init", () => {
   // Self-host the WASM instead of letting the runtime fetch it from unpkg.
   globalThis.rive.RuntimeLoader.setWasmUrl(foundry.utils.getRoute(WASM_PATH));
+  // Start the runtime now, with its error output teed so refused scripts can be
+  // reported (see runtime-log.mjs).
+  startRuntime().catch(err => console.error(`${MODULE_ID} | WASM failed to load`, err));
 
   CONFIG.JournalEntryPage.dataModels[PAGE_TYPE] = RivePageModel;
   CONFIG.JournalEntryPage.typeLabels[PAGE_TYPE] = "FOUNDRY_RIVE.PageType";
@@ -39,7 +43,6 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", () => {
-  globalThis.rive.RuntimeLoader.awaitInstance().catch(err => console.error(`${MODULE_ID} | WASM failed to load`, err));
 
   // Inline embeds mount when they enter the page; the debounced sweep frees
   // players whose canvas left the page without a teardown.

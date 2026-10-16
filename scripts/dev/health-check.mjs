@@ -1,5 +1,6 @@
 import { MODULE_ID } from "../constants.mjs";
 import { hasDynamicRing, playerFor, riveFlags } from "../canvas/rive-canvas.mjs";
+import { RivePlayer } from "../rive-player.mjs";
 
 /**
  * In-world health check for test builds and releases (see "Health check" in
@@ -39,6 +40,7 @@ export async function healthCheck({ redraws = 2, sheets = true, settleMs = 10000
     check("scene has a Rive tile and token to check", rive.tile && rive.token,
       `${rive.tiles.length} Rive tiles, ${rive.tokens.length} Rive tokens`);
     checkPlayers(check, rive);
+    checkScripts(check);
     for (const placeable of [rive.tile, rive.token].filter(Boolean)) checkPointer(check, placeable);
     if (sheets) for (const placeable of [rive.tile, rive.token].filter(Boolean)) await checkSheet(check, placeable);
   } catch (err) {
@@ -110,6 +112,15 @@ function checkPlayers(check, { tiles, tokens }) {
   check("no placeable holds a destroyed texture", deadTextures.length === 0, deadTextures.join(", "));
 }
 
+/** Every loaded Rive file runs its scripts (the runtime refuses unsigned ones). */
+function checkScripts(check) {
+  const refused = [...RivePlayer.live]
+    .filter(player => player.refusedScripts?.length)
+    .map(player => player.refusedScripts.join(", "));
+  check("no Rive file had its scripts refused", refused.length === 0,
+    refused.length ? `${refused.length} player(s): ${[...new Set(refused)].join("; ")} (unsigned; see the README's Known limitations)` : "");
+}
+
 function textureAlive(texture) {
   if (texture === PIXI.Texture.EMPTY) return true;
   return !texture.destroyed && Boolean(texture.baseTexture) && !texture.baseTexture.destroyed && Boolean(texture.baseTexture.resource);
@@ -168,11 +179,17 @@ function captureErrors() {
   const keep = text => {
     if (!KNOWN_NOISE.some(rx => rx.test(text))) list.push(text.slice(0, 500));
   };
+  // Only for the length of the check (the GM ran it); passes everything on.
   const original = console.error;
-  console.error = (...args) => {
-    keep(args.map(a => a?.stack ?? a?.message ?? String(a)).join(" "));
-    original.apply(console, args);
+  const capture = function (...args) {
+    try {
+      keep(args.map(a => a?.stack ?? a?.message ?? String(a)).join(" "));
+    } catch {
+      // Never let our bookkeeping get in the way of an error message.
+    }
+    return original.apply(this, args);
   };
+  console.error = capture;
   const onError = event => keep(String(event?.error?.stack ?? event?.message ?? event));
   const onRejection = event => keep(String(event?.reason?.stack ?? event?.reason ?? event));
   window.addEventListener("error", onError);
@@ -180,7 +197,8 @@ function captureErrors() {
   return {
     list,
     stop() {
-      console.error = original;
+      // Only undo our own change: someone may have wrapped console.error since.
+      if (console.error === capture) console.error = original;
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     }
