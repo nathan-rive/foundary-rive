@@ -300,11 +300,30 @@ function detach(placeable) {
   const bridge = bridges.get(placeable);
   if (!bridge) return;
   bridges.delete(placeable);
-  bridge.stop?.();
-  bridge.player?.destroy();
-  restoreTextures(placeable, bridge);
-  bridge.texture?.destroy(true);
-  bridge.source.remove();
+  releaseBridge(placeable, bridge);
+}
+
+/**
+ * Takes a bridge apart without ever throwing into Foundry (this runs inside its
+ * destroy and tear-down paths). Foundry gets its own texture back first; if that
+ * fails, ours is left for the garbage collector rather than destroyed while a
+ * tile may still hold it.
+ */
+export function releaseBridge(placeable, bridge) {
+  const step = fn => {
+    try {
+      fn();
+      return true;
+    } catch (err) {
+      console.error(`${MODULE_ID} | ${placeable?.document?.documentName ?? "Placeable"} ${placeable?.id}:`, err);
+      return false;
+    }
+  };
+  const restored = step(() => restoreTextures(placeable, bridge));
+  step(() => bridge.stop?.());
+  step(() => bridge.player?.destroy());
+  if (restored) step(() => bridge.texture?.destroy(true));
+  step(() => bridge.source?.remove());
 }
 
 /**
@@ -339,7 +358,12 @@ export function setTileFps(fps) {
   tileFps = Number(fps) || 0;
 }
 
-function tick() {
+/**
+ * Runs on Foundry's canvas ticker, so it must never throw: PIXI doesn't schedule
+ * the next frame after a listener throws, which would freeze the whole canvas.
+ * A bridge that fails here is logged once and left alone.
+ */
+export function tick() {
   const now = performance.now();
   if (now - lastVisibilityCheck >= VISIBILITY_INTERVAL_MS) {
     lastVisibilityCheck = now;
@@ -347,11 +371,11 @@ function tick() {
   }
   const minInterval = tileFps > 0 ? 1000 / tileFps - 1 : 0;
   for (const bridge of bridges.values()) {
-    if (!bridge.dirty || !bridge.texture || bridge.suspended || bridge.holdUploads) continue;
+    if (bridge.failed || !bridge.dirty || !bridge.texture || bridge.suspended || bridge.holdUploads) continue;
     if (now - bridge.lastUpload < minInterval) continue;
     bridge.dirty = false;
     bridge.lastUpload = now;
-    bridge.texture.baseTexture.update();
+    guardBridge(bridge, () => bridge.texture.baseTexture.update());
     stats.uploads++;
   }
 }
@@ -360,16 +384,33 @@ function tick() {
 function updateVisibility() {
   const screen = canvas.app.renderer.screen;
   for (const [placeable, bridge] of bridges) {
-    if (!bridge.player || !placeable.mesh) continue;
-    let visible = placeable.visible && placeable.mesh.visible && placeable.mesh.worldAlpha > 0;
-    if (visible) {
-      const b = placeable.mesh.getBounds();
-      visible = b.right > screen.left && b.left < screen.right && b.bottom > screen.top && b.top < screen.bottom;
-    }
-    if (visible === !bridge.suspended) continue;
-    bridge.suspended = !visible;
-    bridge.player.suspend(bridge.suspended);
+    if (bridge.failed || !bridge.player || !placeable.mesh) continue;
+    guardBridge(bridge, () => {
+      let visible = placeable.visible && placeable.mesh.visible && placeable.mesh.worldAlpha > 0;
+      if (visible) {
+        const b = placeable.mesh.getBounds();
+        visible = b.right > screen.left && b.left < screen.right && b.bottom > screen.top && b.top < screen.bottom;
+      }
+      if (visible === !bridge.suspended) return;
+      bridge.suspended = !visible;
+      bridge.player.suspend(bridge.suspended);
+    });
   }
+}
+
+/** Runs one bridge's per-frame work; an error stops that bridge, never the ticker. */
+function guardBridge(bridge, fn) {
+  try {
+    fn();
+  } catch (err) {
+    bridge.failed = true;
+    console.error(`${MODULE_ID} | a Rive tile or token stopped updating:`, err);
+  }
+}
+
+/** For tests: the live bridges map. */
+export function _bridgesForTests() {
+  return bridges;
 }
 
 function host() {

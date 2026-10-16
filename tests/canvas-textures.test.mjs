@@ -1,5 +1,5 @@
 import assert from "./assert.mjs";
-import { restoreTextures } from "../scripts/canvas/rive-canvas.mjs";
+import { _bridgesForTests, releaseBridge, restoreTextures, tick } from "../scripts/canvas/rive-canvas.mjs";
 
 /**
  * Before our texture is destroyed, the placeable and its mesh must point back at
@@ -51,3 +51,76 @@ export const tests = [
     restoreTextures({ texture: null, mesh: null }, bridge);
   }]
 ];
+
+
+/** A bridge whose parts record the order they were taken apart in. */
+function trackedBridge(log, { playerThrows = false } = {}) {
+  const { placeable, bridge } = setup();
+  bridge.texture.destroy = () => log.push(`texture destroyed (placeable has ${placeable.texture.name})`);
+  bridge.stop = () => log.push("stopped");
+  bridge.player = { destroy: () => { log.push("player destroyed"); if (playerThrows) throw new Error("boom"); } };
+  bridge.source = { remove: () => log.push("source removed") };
+  return { placeable, bridge };
+}
+
+tests.push(
+  ["release hands Foundry its texture back before destroying ours", () => {
+    const log = [];
+    const { placeable, bridge } = trackedBridge(log);
+    releaseBridge(placeable, bridge);
+    assert.equal(log.join(" | "), "stopped | player destroyed | texture destroyed (placeable has foundry) | source removed");
+  }],
+  ["a failing step doesn't stop the rest or escape into Foundry", () => {
+    const log = [];
+    const { placeable, bridge } = trackedBridge(log, { playerThrows: true });
+    const error = console.error;
+    console.error = () => {};
+    try {
+      releaseBridge(placeable, bridge);
+    } finally {
+      console.error = error;
+    }
+    assert.equal(log.includes("source removed") && log.some(l => l.startsWith("texture destroyed")), true);
+  }],
+  ["if Foundry's texture can't be handed back, ours isn't destroyed", () => {
+    const log = [];
+    const { placeable, bridge } = trackedBridge(log);
+    Object.defineProperty(placeable, "texture", { get: () => bridge.texture, set: () => { throw new Error("read-only"); } });
+    const error = console.error;
+    console.error = () => {};
+    try {
+      releaseBridge(placeable, bridge);
+    } finally {
+      console.error = error;
+    }
+    assert.equal(log.some(l => l.startsWith("texture destroyed")), false);
+    assert.equal(log.includes("source removed"), true);
+  }]
+);
+
+
+tests.push(
+  ["a bridge that throws on the ticker is stopped, the ticker carries on", () => {
+    globalThis.canvas ??= {};
+    globalThis.canvas.app = { renderer: { screen: { left: 0, top: 0, right: 100, bottom: 100 } } };
+    const bridges = _bridgesForTests();
+    const updated = [];
+    const bad = { dirty: true, lastUpload: 0, texture: { baseTexture: { update: () => { throw new Error("destroyed"); } } } };
+    const good = { dirty: true, lastUpload: 0, texture: { baseTexture: { update: () => updated.push("good") } } };
+    bridges.set({ id: "bad" }, bad);
+    bridges.set({ id: "good" }, good);
+    const error = console.error;
+    console.error = () => {};
+    try {
+      tick();
+      bad.dirty = good.dirty = true;
+      bad.lastUpload = good.lastUpload = 0;
+      tick();
+    } finally {
+      console.error = error;
+      bridges.clear();
+    }
+    assert.equal(bad.failed, true);
+    assert.equal(updated.length, 2);
+  }]
+);
