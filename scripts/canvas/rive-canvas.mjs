@@ -166,21 +166,57 @@ function sourceSize(placeable) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-/** Re-renders a placeable's source at the size its current view needs, if that changed. */
-function rescale(placeable) {
+/**
+ * Re-renders a placeable's source at the size its current view needs, if that
+ * changed. Resizing a canvas clears it, so the GPU texture keeps showing the old
+ * picture (uploads are held) until Rive has drawn at the new size; then the
+ * texture is resized and uploaded in one step. Swapping straight away showed an
+ * empty or mismatched texture for a frame: a flicker on every zoom.
+ */
+async function rescale(placeable) {
   const bridge = bridges.get(placeable);
   if (!bridge?.player?.rive || !bridge.texture) return;
   const { width, height } = sourceSize(placeable);
-  const { source } = bridge;
+  const { source, player } = bridge;
   if (source.width === width && source.height === height) return;
+
+  const attempt = (bridge.rescaleAttempt ?? 0) + 1;
+  bridge.rescaleAttempt = attempt;
+  bridge.holdUploads = true;
   sizeSource(source, width, height);
-  bridge.player.rive.resizeDrawingSurfaceToCanvas(1);
+  player.rive.resizeDrawingSurfaceToCanvas(1);
+  // A paused (off-screen) player waits here until it plays and has drawn again.
+  await advancesEvenIfPaused(player, 2);
+
+  // Superseded by a later zoom, or torn down while we waited.
+  if (bridge.rescaleAttempt !== attempt || bridges.get(placeable) !== bridge || !bridge.texture) return;
   const base = bridge.texture.baseTexture;
   base.resource.resize(width, height);
   base.setRealSize(width, height);
   base.update();
-  bridge.dirty = true;
+  bridge.holdUploads = false;
+  bridge.dirty = false;
+  bridge.lastUpload = performance.now();
   placeable.renderFlags.set({ refreshMesh: true });
+}
+
+/** Resolves after `n` Rive Advance events, however long the player stays paused; or when it's destroyed. */
+function advancesEvenIfPaused(player, n) {
+  const rive = player.rive;
+  if (!rive) return Promise.resolve();
+  const { Advance } = globalThis.rive.EventType;
+  return new Promise(resolve => {
+    let left = n;
+    const done = () => {
+      rive.off(Advance, onAdvance);
+      resolve();
+    };
+    const onAdvance = () => {
+      if (--left <= 0) done();
+    };
+    rive.on(Advance, onAdvance);
+    player.onDestroy(done);
+  });
 }
 
 /** Sets a source canvas's pixel size and matching CSS size (Rive reads both). */
@@ -285,7 +321,7 @@ function tick() {
   }
   const minInterval = tileFps > 0 ? 1000 / tileFps - 1 : 0;
   for (const bridge of bridges.values()) {
-    if (!bridge.dirty || !bridge.texture || bridge.suspended) continue;
+    if (!bridge.dirty || !bridge.texture || bridge.suspended || bridge.holdUploads) continue;
     if (now - bridge.lastUpload < minInterval) continue;
     bridge.dirty = false;
     bridge.lastUpload = now;
