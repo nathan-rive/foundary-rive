@@ -158,15 +158,32 @@ export async function applyInitialState(player, { target, inputs = [], propertie
     if (!source) continue;
     if (kind === "input") setInput(player, name, source.value);
     else setProperty(player, name, source.value);
-    await nextFrames(2);
+    await afterAdvances(player, 2);
   }
 }
 
-/** Resolves after `n` animation frames, so Rive advances between changes. */
-function nextFrames(n) {
+/**
+ * Resolves once the player's state machine has advanced `n` times, so each change
+ * gets its own step. Waits on Rive's own Advance event rather than animation
+ * frames: while Rive is paused (hidden tab, off-screen tile) the sequence waits
+ * with it instead of piling changes into one frame. A player that isn't playing
+ * at all doesn't advance, so it isn't waited for.
+ */
+function afterAdvances(player, n) {
+  const rive = player.rive;
+  if (!rive?.isPlaying) return Promise.resolve();
+  const { Advance } = globalThis.rive.EventType;
   return new Promise(resolve => {
-    const step = left => (left ? requestAnimationFrame(() => step(left - 1)) : resolve());
-    step(n);
+    let left = n;
+    const done = () => {
+      rive.off(Advance, onAdvance);
+      resolve();
+    };
+    const onAdvance = () => {
+      if (--left <= 0) done();
+    };
+    rive.on(Advance, onAdvance);
+    player.onDestroy(done);
   });
 }
 
