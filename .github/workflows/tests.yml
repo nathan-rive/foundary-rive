@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: 22
 
+      # Test-only DOM for the config-sheet layout tests; never shipped in the module.
+      - name: Test dependencies
+        run: npm install --no-save --no-package-lock linkedom@0.18.12
+
       - name: Unit tests
         run: node tests/run.mjs
 
