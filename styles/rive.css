@@ -242,16 +242,23 @@
 
 /* ---- Live controls ---- */
 
+/* One row per item: the journal view isn't a form, so Foundry's form-group layout doesn't apply there. */
 .rive-live-editor .rive-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 2px 0;
 }
 
 .rive-live-editor .rive-row > label {
   flex: 2;
+  min-width: 0;
 }
 
 .rive-live-editor .rive-row > .form-fields {
+  display: flex;
   flex: 3;
+  min-width: 0;
 }
 
 /* HUD palette, docked beside the Tile / Token HUD like the conditions palette. */

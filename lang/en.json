@@ -100,7 +100,7 @@
     "LiveShow": "Hidden from live controls (click to show)",
     "LiveBoundOne": "1 bound value isn't shown; it follows its data.",
     "LiveBoundMany": "{count} bound values aren't shown; they follow their data.",
-    "LiveHiddenOne": "1 more is hidden on the Rive tab.",
-    "LiveHiddenMany": "{count} more are hidden on the Rive tab."
+    "LiveHiddenOne": "1 more is hidden in the Rive settings.",
+    "LiveHiddenMany": "{count} more are hidden in the Rive settings."
   }
 }
