@@ -1,0 +1,84 @@
+<Rive version="1" kind="fragment">
+    <!-- Placeholder for the token-overlay spike: a ring with a transparent middle,
+         an orbiting dot (so animation shows), and four condition pips whose
+         opacity follows booleans. Not a sample to ship. -->
+    <Artboard viewModelId="0:40" viewModelInstanceId="0:41" defaultStateMachineId="0:7" styleId="0:5" width="600" height="600" name="Ring" id="0:2">
+        <LayoutComponentStyle name="Artboard Style" id="0:5"/>
+
+        <Shape x="300" y="300" name="Ring">
+            <Ellipse width="520" height="520" name="Path"/>
+            <Stroke thickness="18" name="Stroke">
+                <SolidColor colorValue="FFE0B040" name="Color"/>
+            </Stroke>
+        </Shape>
+        <Shape x="300" y="300" name="Inner Ring">
+            <Ellipse width="484" height="484" name="Path"/>
+            <Stroke thickness="4" name="Stroke">
+                <SolidColor colorValue="AA7A5A20" name="Color"/>
+            </Stroke>
+        </Shape>
+
+        <Node x="300" y="300" name="Orbit" id="0:14">
+            <Shape x="260" y="0" name="Spark">
+                <Ellipse width="22" height="22" name="Path"/>
+                <Fill name="Fill">
+                    <SolidColor colorValue="FFFFF2C0" name="Color"/>
+                </Fill>
+            </Shape>
+        </Node>
+
+        <Shape x="300" y="40" name="Dead pip" id="0:20">
+            <DataBindContext sourcePathIds="0:40-0:30" propertyKey="18" converterId="0:50"/>
+            <Ellipse width="70" height="70" name="Path"/>
+            <Fill name="Fill"><SolidColor colorValue="FFD03030" name="Color"/></Fill>
+        </Shape>
+        <Shape x="560" y="300" name="Prone pip" id="0:21">
+            <DataBindContext sourcePathIds="0:40-0:31" propertyKey="18" converterId="0:50"/>
+            <Ellipse width="70" height="70" name="Path"/>
+            <Fill name="Fill"><SolidColor colorValue="FFE8D040" name="Color"/></Fill>
+        </Shape>
+        <Shape x="300" y="560" name="Poison pip" id="0:22">
+            <DataBindContext sourcePathIds="0:40-0:32" propertyKey="18" converterId="0:50"/>
+            <Ellipse width="70" height="70" name="Path"/>
+            <Fill name="Fill"><SolidColor colorValue="FF40C060" name="Color"/></Fill>
+        </Shape>
+        <Shape x="40" y="300" name="Blind pip" id="0:23">
+            <DataBindContext sourcePathIds="0:40-0:33" propertyKey="18" converterId="0:50"/>
+            <Ellipse width="70" height="70" name="Path"/>
+            <Fill name="Fill"><SolidColor colorValue="FF9060E0" name="Color"/></Fill>
+        </Shape>
+
+        <StateMachine name="Ring" id="0:7">
+            <StateMachineLayer name="Layer 1" id="0:8">
+                <EntryState>
+                    <StateTransition stateToId="0:12"/>
+                </EntryState>
+                <AnimationState x="200" animationId="0:6" id="0:12"/>
+            </StateMachineLayer>
+        </StateMachine>
+
+        <LinearAnimation loopValue="loop" duration="240" name="Orbit" id="0:6">
+            <KeyedObject objectId="0:14">
+                <KeyedProperty propertyKey="15">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="6.2831855" interpolationType="linear" frame="240"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+    </Artboard>
+
+    <DataConverterToNumber name="BoolToOpacity" id="0:50"/>
+
+    <ViewModel defaultInstanceId="0:41" name="ConditionRing" id="0:40">
+        <ViewModelPropertyBoolean name="dead" id="0:30"/>
+        <ViewModelPropertyBoolean name="prone" id="0:31"/>
+        <ViewModelPropertyBoolean name="poisoned" id="0:32"/>
+        <ViewModelPropertyBoolean name="blinded" id="0:33"/>
+        <ViewModelInstance exports="true" name="Default" id="0:41">
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:30"/>
+            <ViewModelInstanceBoolean propertyValue="true" viewModelPropertyId="0:31"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:32"/>
+            <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="0:33"/>
+        </ViewModelInstance>
+    </ViewModel>
+</Rive>

@@ -64,6 +64,22 @@ export function riveFlags(doc) {
   };
 }
 
+/**
+ * SPIKE (token overlays): how a token shows its Rive file.
+ * - null: replace the token's image (the normal mode)
+ * - "interface": draw over the token's image, as a sprite in the token's own
+ *   container in the interface group (with its border, bars and condition icons)
+ * - "primary": draw over the token's image, as a second sprite in the primary
+ *   group, kept just above the token's own mesh
+ * `scale` is the overlay's size relative to the token (a ring can stick out).
+ */
+export function overlayMode(doc) {
+  if (doc?.documentName !== "Token") return null;
+  const flags = doc.flags?.[MODULE_ID] ?? {};
+  const mode = ["interface", "primary"].includes(flags.overlay) ? flags.overlay : null;
+  return mode ? { mode, scale: Number(flags.overlayScale) > 0 ? Number(flags.overlayScale) : 1.25 } : null;
+}
+
 /** Stored defaults and bindings on a tile or token document, in the same shape as Rive pages. */
 export function riveState(doc) {
   const flags = doc?.flags?.[MODULE_ID] ?? {};
@@ -104,15 +120,16 @@ export function registerCanvas() {
     });
     Hooks.on(`destroy${kind}`, placeable => detach(placeable));
     Hooks.on(`refresh${kind}`, placeable => {
-      // Keep our texture on the mesh if a refresh restored the image.
       const bridge = bridges.get(placeable);
+      if (bridge?.overlay) return guardBridge(bridge, () => syncOverlay(placeable, bridge));
+      // Keep our texture on the mesh if a refresh restored the image.
       if (bridge?.texture && placeable.mesh && placeable.mesh.texture !== bridge.texture) placeable.mesh.texture = bridge.texture;
     });
     Hooks.on(`update${kind}`, (doc, changes) => {
       const placeable = doc.object;
       if (!placeable || placeable.isPreview) return;
       const flagChanges = foundry.utils.getProperty(changes, `flags.${MODULE_ID}`) ?? {};
-      const reload = ["src", "artboard", "stateMachine", "fit"].some(k => k in flagChanges)
+      const reload = ["src", "artboard", "stateMachine", "fit", "overlay", "overlayScale"].some(k => k in flagChanges)
         || Object.keys(flagChanges).some(k => k.startsWith("-="))
         || `-=${MODULE_ID}` in (changes.flags ?? {})
         || reloadKeys.some(k => k in changes);
@@ -170,8 +187,15 @@ export function layoutScale(sourceWidth, sceneWidth) {
  * it covers. The scale moves in steps of √2 so small zoom changes don't trigger a
  * re-render, and the longest side stays within MIN/MAX_TEXTURE_SIDE.
  */
-function sourceSize(placeable) {
+/** The size a placeable's Rive file is drawn at: its own size, or an overlay's (bigger) size. */
+function drawSize(placeable) {
   const { width, height } = pixelSize(placeable);
+  const overlay = overlayMode(placeable.document);
+  return overlay ? { width: width * overlay.scale, height: height * overlay.scale } : { width, height };
+}
+
+function sourceSize(placeable) {
+  const { width, height } = drawSize(placeable);
   const shown = (canvas.stage?.scale?.x || 1) * (canvas.app?.renderer?.resolution || 1);
   let scale = Math.SQRT2 ** Math.ceil(Math.log(shown) / Math.log(Math.SQRT2));
   const longest = Math.max(width, height) * scale;
@@ -199,7 +223,7 @@ async function rescale(placeable) {
   bridge.holdUploads = true;
   sizeSource(source, width, height);
   // Layout fit: same artboard size in scene units, drawn at the new resolution.
-  player.setLayoutScale(layoutScale(width, pixelSize(placeable).width));
+  player.setLayoutScale(layoutScale(width, drawSize(placeable).width));
   player.rive.resizeDrawingSurfaceToCanvas(1);
   // A paused (off-screen) player waits here until it plays and has drawn again.
   await advancesEvenIfPaused(player, 2);
@@ -213,6 +237,7 @@ async function rescale(placeable) {
   bridge.holdUploads = false;
   bridge.dirty = false;
   bridge.lastUpload = performance.now();
+  if (bridge.overlay) syncOverlay(placeable, bridge);
   placeable.renderFlags.set({ refreshMesh: true });
 }
 
@@ -247,7 +272,9 @@ async function attach(placeable) {
   detach(placeable);
   const doc = placeable.document;
   const settings = riveFlags(doc);
-  if (!settings || !placeable.mesh || hasDynamicRing(doc)) return;
+  const overlay = overlayMode(doc);
+  // Overlays leave the token's image (and its dynamic ring) alone, so they can sit on ringed tokens.
+  if (!settings || !placeable.mesh || (hasDynamicRing(doc) && !overlay)) return;
 
   const { width, height } = sourceSize(placeable);
   const source = document.createElement("canvas");
@@ -263,7 +290,7 @@ async function attach(placeable) {
 
   let player;
   try {
-    player = await RivePlayer.mount(source, { ...settings, offscreen: true, layoutScale: layoutScale(width, pixelSize(placeable).width) });
+    player = await RivePlayer.mount(source, { ...settings, offscreen: true, layoutScale: layoutScale(width, drawSize(placeable).width) });
   } catch (err) {
     console.error(`${MODULE_ID} | ${doc.documentName} ${placeable.id}:`, err);
     if (bridges.get(placeable) === bridge) bridges.delete(placeable);
@@ -288,6 +315,12 @@ async function attach(placeable) {
   player.onDestroy(() => bridge.unbind?.());
   sync.track(doc.uuid, player, { applyNow: false });
   applyState(placeable);
+
+  if (overlay) {
+    bridge.overlay = createOverlay(placeable, bridge, overlay);
+    syncOverlay(placeable, bridge);
+    return;
+  }
 
   // Keep what Foundry drew with, to hand back before our texture is destroyed.
   bridge.original = { texture: placeable.texture, meshTexture: placeable.mesh.texture };
@@ -336,9 +369,11 @@ export function releaseBridge(placeable, bridge) {
     }
   };
   const restored = step(() => restoreTextures(placeable, bridge));
+  // Our own overlay object goes before the texture it shows (never destroying the texture with it).
+  const overlayGone = step(() => removeOverlay(bridge));
   step(() => bridge.stop?.());
   step(() => bridge.player?.destroy());
-  if (restored) step(() => bridge.texture?.destroy(true));
+  if (restored && overlayGone) step(() => bridge.texture?.destroy(true));
   step(() => bridge.source?.remove());
 }
 
@@ -360,6 +395,69 @@ export function restoreTextures(placeable, bridge) {
   if (mesh && !mesh.destroyed && mesh.texture === bridge.texture) {
     mesh.texture = usable(bridge.original?.meshTexture) ? bridge.original.meshTexture : PIXI.Texture.EMPTY;
   }
+}
+
+/* -------------------------------------------- */
+/*  SPIKE: token overlays                       */
+/* -------------------------------------------- */
+
+/** Creates the overlay display object for a token (see overlayMode). */
+function createOverlay(placeable, bridge, { mode, scale }) {
+  if (mode === "interface") {
+    const sprite = new PIXI.Sprite(bridge.texture);
+    sprite.name = `${MODULE_ID}-overlay`;
+    sprite.anchor.set(0.5);
+    sprite.eventMode = "none";
+    // First child: under the token's border, bars, condition icons and name.
+    placeable.addChildAt(sprite, 0);
+    return { mode, scale, object: sprite };
+  }
+  const mesh = new PrimarySpriteMesh({ name: `${MODULE_ID}-overlay`, object: placeable, texture: bridge.texture });
+  mesh.anchor.set(0.5);
+  mesh.eventMode = "none";
+  canvas.primary.addChild(mesh);
+  return { mode, scale, object: mesh };
+}
+
+/** Keeps an overlay sized, placed and sorted with its token, every time the token refreshes. */
+function syncOverlay(placeable, bridge) {
+  const { mode, scale, object } = bridge.overlay;
+  if (!object || object.destroyed) return;
+  const tokenMesh = placeable.mesh;
+  if (mode === "interface") {
+    // The token container's local space: (0,0) is the token's top-left corner.
+    object.position.set(placeable.w / 2, placeable.h / 2);
+    object.width = placeable.w * scale;
+    object.height = placeable.h * scale;
+    object.alpha = tokenMesh?.alpha ?? 1;
+    object.visible = Boolean(tokenMesh?.visible);
+    return;
+  }
+  if (!tokenMesh) return;
+  object.position.set(tokenMesh.x, tokenMesh.y);
+  object.width = placeable.w * scale;
+  object.height = placeable.h * scale;
+  object.alpha = tokenMesh.alpha;
+  object.visible = tokenMesh.visible && placeable.visible;
+  object.elevation = tokenMesh.elevation;
+  object.sortLayer = tokenMesh.sortLayer;
+  object.sort = tokenMesh.sort;
+  object.zIndex = tokenMesh.zIndex + 1;
+  canvas.primary.sortDirty = true;
+}
+
+/** Removes and destroys our overlay object, leaving the shared texture to releaseBridge. */
+function removeOverlay(bridge) {
+  const object = bridge.overlay?.object;
+  bridge.overlay = null;
+  if (!object || object.destroyed) return;
+  object.parent?.removeChild(object);
+  object.destroy({ children: true, texture: false, baseTexture: false });
+}
+
+/** SPIKE: the live overlay objects, for inspection from the console. */
+export function _overlays() {
+  return [...bridges].filter(([, b]) => b.overlay).map(([p, b]) => ({ token: p.name, mode: b.overlay.mode, object: b.overlay.object }));
 }
 
 /* -------------------------------------------- */

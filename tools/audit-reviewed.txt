@@ -22,9 +22,14 @@ bdb41b104c97  scripts/canvas/rive-canvas.mjs  [client: canvas ticker]  canvas.ap
 3d54f304f176  scripts/canvas/rive-canvas.mjs  [client: core object property]  placeable.mesh.texture = bridge.texture;
 0c284c0d3ef1  scripts/canvas/rive-canvas.mjs  [world: document delete]  bridges.delete(placeable);
 195cbf38aec8  scripts/canvas/rive-canvas.mjs  [client: destroy]  step(() => bridge.player?.destroy());
-4ddd062d39b8  scripts/canvas/rive-canvas.mjs  [client: destroy]  if (restored) step(() => bridge.texture?.destroy(true));
+b2560384b7a0  scripts/canvas/rive-canvas.mjs  [client: destroy]  if (restored && overlayGone) step(() => bridge.texture?.destroy(true));
 a5217acd438f  scripts/canvas/rive-canvas.mjs  [client: core object property]  placeable.texture = usable(bridge.original?.texture) ? bridge.original.texture : null;
 fc05cf626517  scripts/canvas/rive-canvas.mjs  [client: core object property]  mesh.texture = usable(bridge.original?.meshTexture) ? bridge.original.meshTexture : PIXI.Texture.EMPTY;
+11886481b1a0  scripts/canvas/rive-canvas.mjs  [client: core object property]  sprite.eventMode = "none";
+baeb55ca67b2  scripts/canvas/rive-canvas.mjs  [client: core object property]  mesh.eventMode = "none";
+9c5768d45ed7  scripts/canvas/rive-canvas.mjs  [client: core object property]  object.visible = Boolean(tokenMesh?.visible);
+ae1e4f4c2e71  scripts/canvas/rive-canvas.mjs  [client: core object property]  object.visible = tokenMesh.visible && placeable.visible;
+5e1f8299c85f  scripts/canvas/rive-canvas.mjs  [client: destroy]  object.destroy({ children: true, texture: false, baseTexture: false });
 d56fe88d34e3  scripts/canvas/rive-canvas.mjs  [world: document update]  guardBridge(bridge, () => bridge.texture.baseTexture.update());
 961c8fe36477  scripts/canvas/rive-canvas.mjs  [client: page-level DOM]  document.body.append(el);
 b591b413e609  scripts/canvas/rive-config.mjs  [client: sheet / HUD render hook]  Hooks.on(`render${sheet}`, (app, html) => injectTab(app, html[0] ?? html));
