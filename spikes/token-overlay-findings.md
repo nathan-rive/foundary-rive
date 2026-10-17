@@ -1,6 +1,8 @@
 # Spike: Rive overlays on image tokens
 
-Branch `spike/token-overlay`, test build `v0.8.8-spike.1` (delete both after the decision). Tested on the v12 server, 2026-10-17.
+Branch `spike/token-overlay`, test build `v0.8.8-spike.1`. Tested on the v12 server, 2026-10-17.
+
+> **Decision (2026-10-17): out of scope for now.** Overlays and condition rings aren't part of the module at the moment. This branch is kept as a reference for later; it isn't to be merged. The condition ring sample is dropped from the samples plan.
 
 ## What was built
 
@@ -36,6 +38,35 @@ Image tokens and a Rive overlay work well together, so **the condition ring is w
 - **B, scene, for things that are part of the world:** auras, costumes, glow, spell effects. They're lit and sorted like the token itself, so a torch-lit aura goes dark when the lights go out.
 
 The B mode would also make the **spell aura** possible without system code: an aura file overlaid on a token, its visibility bound to a condition (`status:<id>`).
+
+## Structural differences and risks
+
+Foundry v12 splits a token in two: its **image** is a mesh in the primary group (lit, darkened, sorted, hidden under roofs), and its **UI** (border, bars, condition icons, name) is a container in the interface group, drawn on top after lighting.
+
+| | A: interface | B: primary |
+|---|---|---|
+| Parent | Inside Foundry's own Token container, at index 0 | Our own mesh in the shared `canvas.primary` group |
+| Destroyed by | Foundry, when it clears or destroys the token | Only us |
+| Following the token | Moves with the container; we set size, alpha and visibility | We copy position, alpha, visibility, elevation, sort and zIndex on every refresh |
+| Lighting | None, always bright | Lit and darkened like the image |
+| Draw order | Above every token image and tile, roofs included | Just after its own token's image |
+
+Risks with **A** (some reasoned from v12 internals, not tested):
+
+1. **A token redraw may destroy our sprite silently.** `clear()` destroys the container's children on a full redraw (new image, size). The texture survives, but nothing checked yet whether we rebuild the sprite or keep a dead pointer and lose the ring. The most likely real bug; fix by rebuilding in the draw hook when the sprite is destroyed.
+2. **It draws over things the image wouldn't:** the edges of neighbouring tokens at 1.3×, and probably over roofs like Foundry's bars, which could show where a token is under a roof. Check from a player account.
+3. **Something unexpected inside Foundry's object:** code reading `token.children[0]` or `token.getBounds()` sees our larger sprite. Clicks use the token's own hit area and our sprite ignores input, so clicks are fine; other modules are the unknown.
+
+Risks with **B**:
+
+1. **Orphans.** Foundry doesn't know our mesh exists; if clean-up fails, a ghost ring stays at the token's last position on that client until at least the next scene redraw.
+2. **Coupled to sorting internals.** We copy `elevation`, `sortLayer`, `sort`, `zIndex + 1` and mark the primary group dirty on every refresh, so it re-sorts every frame while a token moves (untested at dozens of tokens). Equal `zIndex` values can flip order between frames. These fields are the most likely to change in v13.
+3. **`object: placeable`.** Foundry may treat the mesh as the token's own in lookups, and it may write depth/occlusion data (hiding weather inside the ring, changing when roofs fade). Unchecked.
+4. **Only follows on refresh.** Anything that changes the token's mesh directly (Sequencer, Token Magic FX filters) isn't mirrored until the next refresh.
+
+Risks with **both**: neither copies the token's filters (invisible or detection-mode styling), rotation or mirroring; neither draws on the drag preview; both rely on v12's split layout (B on more of it). Both are display only and write nothing to documents beyond the flags.
+
+**Verdict:** A is structurally safer (Foundry owns the parent and clean-up, no sorting internals) and suits indicators; B only for art that must be lit with the scene, after checking Foundry's source for the `object:` link, sorting and depth.
 
 ## To turn it into a feature
 
