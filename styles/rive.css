@@ -29,26 +29,6 @@
   font-style: italic;
 }
 
-.rive-state-heading {
-  margin-top: 0.75rem;
-  border-bottom: 1px solid var(--color-underline-header, #782e22);
-}
-
-.rive-state .rive-type {
-  font-size: var(--font-size-11, 11px);
-  color: var(--color-text-dark-secondary, #4b4a44);
-  font-style: italic;
-}
-
-.rive-state .rive-binding label {
-  padding-left: 1rem;
-  color: var(--color-text-dark-secondary, #4b4a44);
-}
-
-.rive-state button.rive-reset {
-  flex: 0 0 28px;
-}
-
 .rive-live {
   margin: 0.5rem 0;
   padding: 0.25rem 0.5rem;
@@ -59,6 +39,260 @@
 .rive-live summary {
   cursor: pointer;
   font-weight: bold;
+}
+
+/* ---- Shared editor rows (settings and live controls) ---- */
+
+.rive-state-heading {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0 0 2px;
+  border-bottom: 1px solid var(--color-underline-header, #782e22);
+  font-size: var(--font-size-14, 14px);
+}
+
+.rive-state-editor .rive-row label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rive-state-editor .rive-type {
+  font-size: var(--font-size-11, 11px);
+  color: var(--color-text-dark-secondary, #4b4a44);
+  font-style: italic;
+}
+
+.rive-state-editor .rive-row .form-fields {
+  gap: 4px;
+  align-items: center;
+}
+
+.rive-state-editor .rive-value,
+.rive-state-editor .rive-bind {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.rive-state-editor .rive-value > input:not([type="checkbox"]),
+.rive-state-editor .rive-value > select,
+.rive-state-editor .rive-value > .rive-number,
+.rive-state-editor .rive-value > .rive-fire {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A property shows its value or its binding, never both. */
+.rive-state-editor .rive-row .rive-bind,
+.rive-state-editor .rive-row.rive-bound .rive-value {
+  display: none;
+}
+
+.rive-state-editor .rive-row.rive-bound .rive-bind {
+  display: flex;
+}
+
+.rive-state-editor .rive-bind .rive-suggest {
+  flex: 1;
+  min-width: 0;
+}
+
+.rive-state-editor .rive-side {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.rive-state-editor button.rive-reset,
+.rive-state-editor button.rive-eye {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  line-height: 22px;
+  padding: 0;
+  margin: 0;
+}
+
+.rive-state-editor button.rive-eye.hidden-live {
+  opacity: 0.55;
+}
+
+/* Small slide toggle: value (off) or binding (on). */
+.rive-switch {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.rive-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.rive-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  background: var(--color-border-light-2, #999);
+  transition: background 0.15s;
+}
+
+.rive-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.rive-switch input:checked + .rive-switch-track {
+  background: var(--color-border-highlight, #ff6400);
+}
+
+.rive-switch input:checked + .rive-switch-track::after {
+  transform: translateX(12px);
+}
+
+.rive-switch input:focus-visible + .rive-switch-track {
+  outline: 2px solid var(--color-shadow-highlight, #ff6400);
+}
+
+/* Suggestions drawn in the sheet (not a browser datalist). */
+.rive-suggest {
+  position: relative;
+  display: flex;
+}
+
+.rive-suggest > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rive-suggest-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  max-height: 12rem;
+  overflow-y: auto;
+  margin: 1px 0 0;
+  padding: 2px 0;
+  list-style: none;
+  background: var(--color-bg-option, #f0f0e0);
+  border: 1px solid var(--color-border-dark-tertiary, #7a7971);
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  color: var(--color-text-dark-primary, #191813);
+}
+
+.rive-suggest-menu li {
+  padding: 2px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rive-suggest-menu li:hover,
+.rive-suggest-menu li.active {
+  background: var(--color-border-highlight, #ff6400);
+  color: #fff;
+}
+
+.rive-live-note:empty {
+  display: none;
+}
+
+/* ---- Live controls ---- */
+
+.rive-live-editor .rive-row {
+  margin: 2px 0;
+}
+
+.rive-live-editor .rive-row > label {
+  flex: 2;
+}
+
+.rive-live-editor .rive-row > .form-fields {
+  flex: 3;
+}
+
+/* HUD palette, docked beside the Tile / Token HUD like the conditions palette. */
+.rive-live-palette {
+  position: absolute;
+  z-index: 10;
+  width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px 8px;
+  pointer-events: all;
+  background: var(--color-cool-5-90, rgba(11, 10, 19, 0.9));
+  border: 1px solid var(--color-cool-4, #302831);
+  border-radius: 6px;
+  box-shadow: 0 0 10px var(--color-shadow-dark, #000);
+  color: var(--color-text-light-highlight, #f0f0e0);
+  font-size: var(--font-size-12, 12px);
+}
+
+.rive-live-palette .rive-live-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.rive-live-palette .rive-live-header h4 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  color: inherit;
+}
+
+.rive-live-palette .rive-live-header button {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 24px;
+  line-height: 22px;
+  padding: 0;
+  margin: 0;
+}
+
+.rive-live-palette .hint,
+.rive-live-palette .rive-type {
+  color: var(--color-text-light-6, #b5b3a4);
+}
+
+.rive-live-palette .rive-state-heading {
+  color: inherit;
+  border-bottom-color: var(--color-cool-4, #302831);
+  font-size: var(--font-size-13, 13px);
+}
+
+.rive-live-palette .rive-row {
+  display: flex;
+  align-items: center;
+}
+
+.rive-live-palette .rive-row > label {
+  color: inherit;
 }
 
 .rive-number {

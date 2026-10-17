@@ -36,8 +36,8 @@ ca2078d68579  scripts/canvas/rive-config.mjs  [world: document delete]  previews
 acef1e15d799  scripts/canvas/rive-config.mjs  [world: file upload / folder]  srcInput.value = await uploadRiv(file);
 6796af27084f  scripts/canvas/rive-config.mjs  [client: destroy]  if (!tab.isConnected) return player.destroy();
 f968b15897ba  scripts/canvas/rive-hud.mjs  [client: sheet / HUD render hook]  Hooks.on(`render${hud}`, (app, html) => addButton(app, html[0] ?? html));
+e5656fed76a8  scripts/canvas/rive-hud.mjs  [client: canvas lifecycle hook]  Hooks.on("canvasTearDown", () => closePalette());
 e81c1f505e75  scripts/canvas/rive-hud.mjs  [world: document update]  await doc.update({
-fb3d441a6103  scripts/canvas/rive-hud.mjs  [world: document delete]  windows.delete(uuid);
 fcb09c428da5  scripts/dev/health-check.mjs  [client: core patch]  console.error = capture;
 614dbe34c688  scripts/dev/health-check.mjs  [client: core patch]  if (console.error === capture) console.error = original;
 0b7cec482ee8  scripts/enricher.mjs  [client: destroy]  if (!canvas.isConnected) return player.destroy();
@@ -48,7 +48,7 @@ abe955ddb875  scripts/journal/rive-page-sheet.mjs  [world: document update]  awa
 e95e09f8243c  scripts/journal/rive-page-sheet.mjs  [world: file upload / folder]  const src = await uploadRiv(file);
 87651dab58a7  scripts/journal/rive-page-sheet.mjs  [world: document update]  await this.document.update({
 399f0256ca72  scripts/journal/rive-page-sheet.mjs  [client: destroy]  this.#player?.destroy();
-9ec7e82c9f22  scripts/journal/state-editor.mjs  [client: page-level DOM]  document.body.append(docs, paths);
+45114dd12cc8  scripts/journal/state-editor.mjs  [world: document delete]  else visibility.hidden.delete(key);
 f8301fec6cc2  scripts/main.mjs  [client: destroy]  close: () => player?.destroy()
 f1e536d7aaa9  scripts/riv-wrapper.mjs  [world: network fetch]  const res = await fetch(src);
 5fa7f825f79b  scripts/riv-wrapper.mjs  [world: file upload / folder]  export async function uploadRiv(file, { source = "data", dir = uploadRoot() } = {}) {

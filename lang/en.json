@@ -23,13 +23,9 @@
     "Fire": "Fire",
     "TileTab": "Rive",
     "TileHint": "Play a Rive animation on this tile. The tile's image stays underneath as a fallback for anyone without the module.",
-    "TileDefaults": "Default values and bindings",
     "TileNotLoaded": "This tile's Rive file hasn't loaded yet.",
-    "TileLiveTitle": "Rive live controls: {name}",
     "TokenHint": "Play a Rive animation as this token's image. The token's normal image stays underneath as a fallback for anyone without the module. In bindings, @actor means this token's own actor (linked or not) and @token the token itself; a path of status:prone (or any condition) is true while it applies.",
     "TokenRingWarning": "This token uses a dynamic token ring. Rive isn't drawn on ring tokens yet; turn the ring off in the Appearance tab to use Rive.",
-    "TokenLiveHint": "Changes here play on this token for everyone viewing the scene right now. They aren't saved unless you save them as defaults.",
-    "TileLiveHint": "Changes here play on this tile for everyone viewing the scene right now. They aren't saved unless you save them as defaults.",
     "TileSourceHint": "An uploaded .riv.json file or a URL to a .riv file. Leave empty to turn Rive off for this tile.",
     "Settings": {
       "TileFps": {
@@ -49,9 +45,8 @@
     "LiveSave": "Save current values as defaults",
     "LiveSaved": "Saved the live values as this page's defaults.",
     "Reset": "Reset to the file's value",
-    "BindTo": "↳ Bind to",
-    "BindUuid": "Drop a document, paste its UUID, or @actor / @token",
-    "BindPath": "Data path (system.attributes.hp.value) or status:<condition>",
+    "BindUuid": "Document: drop one, or @actor / @token",
+    "BindPath": "Data path, or status:<condition>",
     "Fit": {
       "contain": "Contain",
       "cover": "Cover",
@@ -75,8 +70,7 @@
     },
     "BindActorShorthand": "This token's actor",
     "BindTokenShorthand": "This token",
-    "LiveBoundHidden": "Bound values aren't shown here; they follow their data.",
-    "LiveAllBound": "Every value in this file is bound to data, so there's nothing to change live.",
+    "LiveAllBound": "Everything in this file is bound or hidden, so there's nothing to change live.",
     "Matt": {
       "Group": "Rive",
       "SetAction": "Set Rive value",
@@ -99,6 +93,14 @@
       "VariableHelp": "Name to store the value under (default: the Rive name). Later actions read it as rive.<name>, for example Check value with rive.sprung, or {{value.rive.sprung}}. Compare text in quotes (\"Open\"); for true/false, check true and use the fail landing for false.",
       "GetText": "<span class=\"action-style\">Get Rive</span> <span class=\"details-style\">{name}</span> from <span class=\"entity-style\">{entity}</span> as <span class=\"value-style\">{variable}</span>"
     },
-    "ScriptsRefused": "This file's script(s) {names} didn't run: Rive only runs signed scripts on the web. Export or publish the file signed from Rive; until then, whatever they draw or drive won't show."
+    "ScriptsRefused": "This file's script(s) {names} didn't run: Rive only runs signed scripts on the web. Export or publish the file signed from Rive; until then, whatever they draw or drive won't show.",
+    "TokenSourceHint": "An uploaded .riv.json file or a URL to a .riv file. Leave empty to turn Rive off for this token.",
+    "BindToggle": "Set a value, or bind to Foundry data",
+    "LiveHide": "Shown in live controls (click to hide)",
+    "LiveShow": "Hidden from live controls (click to show)",
+    "LiveBoundOne": "1 bound value isn't shown; it follows its data.",
+    "LiveBoundMany": "{count} bound values aren't shown; they follow their data.",
+    "LiveHiddenOne": "1 more is hidden on the Rive tab.",
+    "LiveHiddenMany": "{count} more are hidden on the Rive tab."
   }
 }

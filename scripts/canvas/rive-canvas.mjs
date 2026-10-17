@@ -68,7 +68,7 @@ export function riveFlags(doc) {
 export function riveState(doc) {
   const flags = doc?.flags?.[MODULE_ID] ?? {};
   const list = value => (Array.isArray(value) ? value : []);
-  return { inputs: list(flags.inputs), properties: list(flags.properties), bindings: list(flags.bindings) };
+  return { inputs: list(flags.inputs), properties: list(flags.properties), bindings: list(flags.bindings), liveHidden: list(flags.liveHidden) };
 }
 
 /** v1 doesn't draw Rive on tokens with a dynamic token ring. */
