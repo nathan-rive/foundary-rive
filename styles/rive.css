@@ -99,6 +99,11 @@
   min-width: 0;
 }
 
+/* The data path is usually the longer of the two. */
+.rive-state-editor .rive-bind .rive-suggest:last-child {
+  flex: 1.6;
+}
+
 .rive-state-editor .rive-side {
   display: flex;
   gap: 4px;
@@ -186,7 +191,9 @@
   position: absolute;
   top: 100%;
   left: 0;
-  right: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 20rem;
   z-index: 100;
   max-height: 12rem;
   overflow-y: auto;
@@ -247,6 +254,17 @@
   box-shadow: 0 0 10px var(--color-shadow-dark, #000);
   color: var(--color-text-light-highlight, #f0f0e0);
   font-size: var(--font-size-12, 12px);
+  text-align: left;
+}
+
+.rive-live-palette button {
+  color: var(--color-text-light-highlight, #f0f0e0);
+  background: var(--color-cool-4, #302831);
+  border: 1px solid var(--color-cool-3, #47404a);
+}
+
+.rive-live-palette button:hover {
+  box-shadow: 0 0 5px var(--color-shadow-highlight, #ff6400);
 }
 
 .rive-live-palette .rive-live-header {

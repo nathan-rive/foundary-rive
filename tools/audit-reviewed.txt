@@ -37,6 +37,7 @@ acef1e15d799  scripts/canvas/rive-config.mjs  [world: file upload / folder]  src
 6796af27084f  scripts/canvas/rive-config.mjs  [client: destroy]  if (!tab.isConnected) return player.destroy();
 f968b15897ba  scripts/canvas/rive-hud.mjs  [client: sheet / HUD render hook]  Hooks.on(`render${hud}`, (app, html) => addButton(app, html[0] ?? html));
 e5656fed76a8  scripts/canvas/rive-hud.mjs  [client: canvas lifecycle hook]  Hooks.on("canvasTearDown", () => closePalette());
+fa1d5df02114  scripts/canvas/rive-hud.mjs  [client: canvas lifecycle hook]  Hooks.on("canvasPan", () => {
 e81c1f505e75  scripts/canvas/rive-hud.mjs  [world: document update]  await doc.update({
 fcb09c428da5  scripts/dev/health-check.mjs  [client: core patch]  console.error = capture;
 614dbe34c688  scripts/dev/health-check.mjs  [client: core patch]  if (console.error === capture) console.error = original;

@@ -19,6 +19,10 @@ export function registerRiveHud() {
     });
   }
   Hooks.on("canvasTearDown", () => closePalette());
+  // The HUD rescales and moves with the canvas; keep the palette placed.
+  Hooks.on("canvasPan", () => {
+    if (open?.element?.isConnected) placePalette(open);
+  });
 }
 
 /** The open palette, if any: {uuid, stop, element}. One at a time, like the HUD. */
@@ -60,9 +64,6 @@ function openPalette(root, column, placeable, button) {
   const doc = placeable.document;
   const element = document.createElement("section");
   element.className = "rive-live-palette";
-  // Beside the HUD's right column, where Foundry puts the conditions palette.
-  element.style.left = `${column.offsetLeft + column.offsetWidth + 8}px`;
-  element.style.top = `${column.offsetTop}px`;
   const title = doc.documentName === "Token" ? doc.name : riveFlags(doc).src.split("/").pop();
   element.innerHTML = `
     <header class="rive-live-header">
@@ -107,7 +108,41 @@ function openPalette(root, column, placeable, button) {
     });
     ui.notifications.info(game.i18n.localize("FOUNDRY_RIVE.LiveSaved"));
   });
-  open = { uuid: doc.uuid, stop, element };
+  open = { uuid: doc.uuid, stop, element, root, column };
+  placePalette(open);
+}
+
+/** Gap between the HUD and the palette, in screen pixels. */
+const GAP = 8;
+
+/**
+ * Puts the palette beside the HUD's right column (where Foundry puts the
+ * conditions palette) at a constant screen size, whatever the canvas zoom: the
+ * HUD is scaled with the canvas, so the palette undoes that scale. If it would
+ * run under the sidebar it goes to the HUD's left instead, and it's kept inside
+ * the window vertically.
+ */
+function placePalette({ element, root, column }) {
+  const scale = new DOMMatrix(getComputedStyle(root).transform).a || 1;
+  element.style.transformOrigin = "top left";
+  element.style.transform = `scale(${1 / scale})`;
+  element.style.maxHeight = `${Math.round(window.innerHeight * 0.6)}px`;
+  // Positions are in the HUD's own (scaled) units; the palette's width in them is width / scale.
+  const width = element.offsetWidth / scale;
+  let left = column.offsetLeft + column.offsetWidth + GAP / scale;
+  let top = column.offsetTop;
+  Object.assign(element.style, { left: `${left}px`, top: `${top}px` });
+  const rect = element.getBoundingClientRect();
+  const limit = (document.getElementById("sidebar")?.getBoundingClientRect().left ?? window.innerWidth) - GAP;
+  if (rect.right > limit) {
+    const leftColumn = root.querySelector(".col.left") ?? root.firstElementChild;
+    left = (leftColumn?.offsetLeft ?? 0) - width - GAP / scale;
+  }
+  // Vertically: up if it runs off the bottom, but never above the top of the window.
+  let shift = Math.max(0, rect.bottom - (window.innerHeight - GAP));
+  shift = Math.min(shift, Math.max(0, rect.top - GAP));
+  top -= shift / scale;
+  Object.assign(element.style, { left: `${left}px`, top: `${top}px` });
 }
 
 function notLoaded() {
