@@ -29,6 +29,7 @@ export function registerRiveHud() {
 let open = null;
 
 function closePalette() {
+  open?.observer?.disconnect();
   open?.stop?.();
   open?.element?.remove();
   open = null;
@@ -108,7 +109,14 @@ function openPalette(root, column, placeable, button) {
     });
     ui.notifications.info(game.i18n.localize("FOUNDRY_RIVE.LiveSaved"));
   });
-  open = { uuid: doc.uuid, stop, element, root, column };
+  // Foundry hides the HUD (clear()) without a hook when it closes, deselected or
+  // not; close with it, as the conditions palette does, so it doesn't come back
+  // the next time the HUD opens.
+  const observer = new MutationObserver(() => {
+    if (open?.element === element && (root.style.display === "none" || !root.isConnected)) closePalette();
+  });
+  observer.observe(root, { attributes: true, attributeFilter: ["style", "class"] });
+  open = { uuid: doc.uuid, stop, element, root, column, observer };
   placePalette(open);
 }
 

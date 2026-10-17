@@ -8,7 +8,7 @@ In Foundry's setup screen, open **Add-on Modules → Install Module** and paste 
 
 | Foundry | Manifest URL |
 | --- | --- |
-| v12 | `https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json` |
+| v12 | `https://github.com/nathan-rive/foundry-rive/releases/download/channel-v12/module.json` |
 
 Each channel only ever offers releases built for that Foundry version, so Foundry's update check stays on the right line.
 

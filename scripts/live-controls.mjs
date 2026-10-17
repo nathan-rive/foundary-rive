@@ -13,10 +13,11 @@ import { describe } from "./state.mjs";
 /**
  * Editor for stored defaults: every change is saved; triggers only preview.
  * With `liveHidden` (tiles and tokens), each item also gets an eye toggle that
- * keeps it out of the live controls.
+ * keeps it out of the live controls. `target` ("token", "tile" or "page") picks
+ * the binding suggestions that make sense there.
  * @param {(changes: {inputs?: object[], properties?: object[], bindings?: object[], liveHidden?: string[]}) => Promise} save
  */
-export function renderDefaultsEditor(container, player, { inputs = [], properties = [], bindings = [], liveHidden }, save) {
+export function renderDefaultsEditor(container, player, { inputs = [], properties = [], bindings = [], liveHidden }, save, { target } = {}) {
   const edits = defaultsEdits({ inputs, properties, bindings, liveHidden }, save);
   renderStateEditor(container, player, {
     values: {
@@ -25,7 +26,7 @@ export function renderDefaultsEditor(container, player, { inputs = [], propertie
     },
     onChange: edits.setValue,
     onFire: (kind, name) => (kind === "input" ? fireInput(player, name) : setProperty(player, name, true)),
-    bindings: { list: bindings, onChange: edits.setBinding },
+    bindings: { list: bindings, onChange: edits.setBinding, target },
     visibility: liveHidden ? { hidden: new Set(liveHidden), onChange: edits.setLiveHidden } : undefined
   });
 }

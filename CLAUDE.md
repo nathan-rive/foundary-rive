@@ -1,6 +1,6 @@
 # Rive for Foundry: instructions for Claude
 
-Rive for Foundry (module id `foundry-rive`, repo `nathan-rive/foundary-rive`) is a Foundry VTT **v12** module that plays Rive (`.riv`) animations in journal pages, inline `@Rive[...]` embeds, scene tiles and tokens. GMs can drive Rive state live for every client, and bind Rive properties to Foundry data. It is system-agnostic. It runs inside people's campaign worlds (including the owner's own v12 campaign), so **protecting world data comes before every feature.** Read this file before changing anything.
+Rive for Foundry (module id `foundry-rive`, repo `nathan-rive/foundry-rive`) is a Foundry VTT **v12** module that plays Rive (`.riv`) animations in journal pages, inline `@Rive[...]` embeds, scene tiles and tokens. GMs can drive Rive state live for every client, and bind Rive properties to Foundry data. It is system-agnostic. It runs inside people's campaign worlds (including the owner's own v12 campaign), so **protecting world data comes before every feature.** Read this file before changing anything.
 
 ## Before EVERY commit: run the safety audit (mandatory)
 
@@ -61,7 +61,7 @@ When a change touches the canvas, also try by hand: resizing the scene or changi
 
 ## Releases and the server
 
-- **Channels:** servers install and update from the rolling `channel-v12` pre-release (`https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json`), never `releases/latest`. A normal (non-pre-) release updates the channel; pre-releases never do.
+- **Channels:** servers install and update from the rolling `channel-v12` pre-release (`https://github.com/nathan-rive/foundry-rive/releases/download/channel-v12/module.json`), never `releases/latest`. A normal (non-pre-) release updates the channel; pre-releases never do.
 - **Test builds** are GitHub pre-releases from a feature branch, installed from their own tag's `module.json`. Run the health check on each one before handing it to the user. Foundry compares versions part by part on `.` and treats `X.Y.Z-dev.N` as **newer** than `X.Y.Z`, and it refuses downgrades. So a test build named `X.Y.Z-dev.N` must be followed by a release strictly above `X.Y.Z`.
 - **Releases and pushes are outward-facing** (the repo is public). Ask before pushing, merging or releasing unless the user has already said to for the current work.
 - **The owner's server** is `https://vtt.nathanmitchell.graphics/` (Foundry v12). Claude can't sign in to its admin page (it isn't localhost): the user signs in. To update: log out → "Return to Setup" on the join page (shuts the world down) → `Setup.installPackage` with the manifest URL → launch the world → join. Right after a release the channel download can be stale for a few minutes; installing from the release's own tag manifest works and still points future updates at the channel.

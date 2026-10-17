@@ -1,6 +1,7 @@
 import assert from "./assert.mjs";
 import { parseHTML } from "linkedom";
-import { itemKey, renderStateEditor, sliderRange } from "../scripts/journal/state-editor.mjs";
+import { documentSuggestions, itemKey, pathSuggestions, renderStateEditor, sliderRange } from "../scripts/journal/state-editor.mjs";
+import { registerDocument } from "./setup.mjs";
 import { defaultsEdits, liveExclusions, liveNoteText } from "../scripts/live-controls.mjs";
 import { filterOptions } from "../scripts/suggest.mjs";
 
@@ -42,6 +43,37 @@ const rows = container => [...container.querySelectorAll(".rive-row")].map(row =
 }));
 
 export const tests = [
+  ["binding suggestions: @actor/@token only on tokens", () => {
+    assert.equal(documentSuggestions("token").map(o => o.value).join(), "@actor,@token");
+    assert.equal(documentSuggestions("tile").length, 0);
+    assert.equal(documentSuggestions("page").length, 0);
+  }],
+  ["binding suggestions: conditions only for documents that can have them", () => {
+    globalThis.CONFIG ??= {};
+    const saved = CONFIG.statusEffects;
+    CONFIG.statusEffects = [{ id: "prone", name: "Prone" }, { id: "blind", name: "Blind" }];
+    registerDocument("Actor.sugg", { documentName: "Actor", uuid: "Actor.sugg" });
+    registerDocument("JournalEntry.sugg", { documentName: "JournalEntry", uuid: "JournalEntry.sugg" });
+    try {
+      assert.equal(pathSuggestions("token", "@actor").length, 2);
+      assert.equal(pathSuggestions("token", "@token").length, 2);
+      assert.equal(pathSuggestions("tile", "@actor").length, 0); // no actor on a tile
+      assert.equal(pathSuggestions("tile", "").length, 0);
+      assert.equal(pathSuggestions("tile", "Actor.sugg").map(o => o.value).join(), "status:prone,status:blind");
+      assert.equal(pathSuggestions("page", "JournalEntry.sugg").length, 0);
+      assert.equal(pathSuggestions("tile", "not a uuid").length, 0);
+    } finally {
+      CONFIG.statusEffects = saved;
+    }
+  }],
+  ["live controls don't spell out types; the settings do", () => withDom(container => {
+    const player = fakePlayer([["hp", "number"]]);
+    const base = { values: { input: new Map(), property: new Map() }, onChange: () => {}, onFire: () => {} };
+    renderStateEditor(container, player, { ...base, live: true });
+    assert.equal(container.querySelectorAll(".rive-type").length, 0);
+    renderStateEditor(container, player, base);
+    assert.equal(container.querySelector(".rive-type")?.textContent, "number");
+  })],
   ["slider ranges grow in powers of ten to hold the value", () => {
     assert.deepEqual(sliderRange(0), { min: 0, max: 100 });
     assert.deepEqual(sliderRange(30), { min: 0, max: 100 });

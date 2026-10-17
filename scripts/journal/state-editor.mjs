@@ -19,7 +19,8 @@ import { attachSuggestions } from "../suggest.mjs";
  * @param {(kind, name, value) => void} config.onChange         value is null for "reset"
  * @param {(kind, name) => void} config.onFire
  * @param {boolean} [config.live=false]                         report every slider step, hide reset
- * @param {{list: object[], onChange: (name, binding) => void}} [config.bindings]  settings: value-or-binding toggle
+ * @param {{list: object[], onChange: (name, binding) => void, target?: "token"|"tile"|"page"}} [config.bindings]
+ *   settings: value-or-binding toggle; `target` decides which suggestions make sense
  * @param {{hidden: Set<string>, onChange: (key, hidden) => void}} [config.visibility]  settings: eye toggles (keys "kind:name")
  * @param {Set<string>} [config.hide]                           live: item keys ("kind:name") not to show
  * @param {string} [config.emptyText]                           shown when there's nothing to show
@@ -58,12 +59,13 @@ export function renderStateEditor(container, player, { values, onChange, onFire,
       let bindPane = null;
       // Properties (not triggers) can follow Foundry data instead of a set value.
       if (bindings && kind === "property" && item.type !== "trigger") {
-        const toggle = bindingToggle(item.name, boundBy.get(item.name), bindings.onChange);
+        const toggle = bindingToggle(item.name, boundBy.get(item.name), bindings.onChange, bindings.target);
         bindPane = toggle.pane;
         side.push(toggle.switch);
       }
       if (visibility) side.push(eyeButton(key, visibility));
-      container.append(row(item.name, item.type, main, reset, bindPane, side));
+      // The control shows the type (a colour box, a dropdown); only the settings spell it out.
+      container.append(row(item.name, live ? null : item.type, main, reset, bindPane, side));
     }
   };
   section("input", "FOUNDRY_RIVE.Inputs", inputs);
@@ -151,19 +153,42 @@ function valueControl(type, value, options, live, onChange) {
   }
 }
 
-/** `@actor` / `@token`, for a binding's document field. */
-function documentSuggestions() {
+/**
+ * Suggestions for a binding's document field: `@actor` / `@token` mean the
+ * token's own actor and the token itself, so they're offered only on tokens.
+ * Tiles and journal pages have nothing to suggest (drop a document instead).
+ */
+export function documentSuggestions(target) {
+  if (target !== "token") return [];
   return [
     { value: "@actor", label: game.i18n.localize("FOUNDRY_RIVE.BindActorShorthand") },
     { value: "@token", label: game.i18n.localize("FOUNDRY_RIVE.BindTokenShorthand") }
   ];
 }
 
-/** `status:<id>` for each status effect (condition) this world defines, for a binding's path field. */
-function pathSuggestions() {
+/**
+ * Suggestions for a binding's path field: `status:<id>` for each condition this
+ * world defines, but only when the document can have conditions (an actor or a
+ * token, by shorthand on a token or by UUID anywhere). Otherwise none.
+ */
+export function pathSuggestions(target, documentField) {
+  if (!canHaveConditions(target, documentField)) return [];
   return (CONFIG.statusEffects ?? [])
     .filter(status => status?.id)
     .map(status => ({ value: `status:${status.id}`, label: game.i18n.localize(status.name ?? status.label ?? status.id) }));
+}
+
+function canHaveConditions(target, documentField) {
+  const value = String(documentField ?? "").trim();
+  if (value === "@actor" || value === "@token") return target === "token";
+  if (!value) return false;
+  let doc = null;
+  try {
+    doc = globalThis.fromUuidSync?.(value) ?? null;
+  } catch {
+    return false; // not a UUID (or one in a compendium that isn't loaded)
+  }
+  return ["Actor", "Token"].includes(doc?.documentName);
 }
 
 /**
@@ -172,8 +197,8 @@ function pathSuggestions() {
  * binding; turning it back on (before the editor is rebuilt) brings back what was
  * typed, so a slip of the switch costs nothing.
  */
-function bindingToggle(name, binding, onChange) {
-  const pane = bindingFields(binding, next => onChange(name, next));
+function bindingToggle(name, binding, onChange, target) {
+  const pane = bindingFields(binding, next => onChange(name, next), target);
   const input = Object.assign(document.createElement("input"), { type: "checkbox", checked: Boolean(binding?.uuid || binding?.path) });
   const sw = document.createElement("label");
   sw.className = "rive-switch";
@@ -191,7 +216,7 @@ function bindingToggle(name, binding, onChange) {
   return { switch: sw, pane: Object.assign(pane.element, { _riveBound: input.checked }) };
 }
 
-function bindingFields(binding, onChange) {
+function bindingFields(binding, onChange, target) {
   const uuid = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.uuid ?? "",
@@ -223,7 +248,10 @@ function bindingFields(binding, onChange) {
   });
   const element = document.createElement("div");
   element.className = "rive-bind";
-  element.append(attachSuggestions(uuid, documentSuggestions), attachSuggestions(path, pathSuggestions));
+  element.append(
+    attachSuggestions(uuid, () => documentSuggestions(target)),
+    attachSuggestions(path, () => pathSuggestions(target, uuid.value))
+  );
   return { element, read, focus: () => (uuid.value ? path : uuid).focus() };
 }
 
@@ -255,10 +283,12 @@ function row(name, type, main, reset, bindPane, side) {
   const label = document.createElement("label");
   label.textContent = name;
   label.title = name;
-  const typeTag = document.createElement("span");
-  typeTag.className = "rive-type";
-  typeTag.textContent = type;
-  label.append(" ", typeTag);
+  if (type) {
+    const typeTag = document.createElement("span");
+    typeTag.className = "rive-type";
+    typeTag.textContent = type;
+    label.append(" ", typeTag);
+  }
   const fields = document.createElement("div");
   fields.className = "form-fields";
   const value = document.createElement("div");

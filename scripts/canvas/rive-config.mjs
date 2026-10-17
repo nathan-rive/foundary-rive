@@ -211,7 +211,8 @@ async function loadPreview(app, src, tab, status) {
 
   const body = document.createElement("div");
   stateSection.append(body);
-  renderDefaultsEditor(body, player, riveState(app.object), changes => saveFlags(app, changes));
+  const target = app.object?.documentName === "Token" || isPrototype(app) ? "token" : "tile";
+  renderDefaultsEditor(body, player, riveState(app.object), changes => saveFlags(app, changes), { target });
   app.setPosition({ height: "auto" });
 }
 

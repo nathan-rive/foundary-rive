@@ -93,7 +93,7 @@ export class RivePageSheet extends JournalPageSheet {
     renderDefaultsEditor(container, player, this.document.system, changes => {
       const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`system.${key}`, list]));
       return this.document.update(update);
-    });
+    }, { target: "page" });
   }
 
   /** Journal view, GM only: drive the animation live for every client viewing this page. */
