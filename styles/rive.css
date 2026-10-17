@@ -41,6 +41,11 @@
   font-weight: bold;
 }
 
+/* Browse, then upload, everywhere: Foundry gives .file-picker buttons order 99. */
+.rive-upload-button {
+  order: 100;
+}
+
 /* ---- Shared editor rows (settings and live controls) ---- */
 
 .rive-state-heading {
@@ -54,6 +59,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Journal page fields sit 16px in from the sheet's edges; line the headings up with them. */
+.rive-page .rive-state-heading {
+  margin-inline: 16px;
+}
+
+/* A checkbox doesn't stretch: keep its reset button at the end of the row like the others. */
+.rive-state-editor .rive-value > input[type="checkbox"] {
+  margin-right: auto;
 }
 
 .rive-state-editor .rive-type {
@@ -311,6 +326,19 @@
 
 .rive-live-palette .rive-row > label {
   color: inherit;
+}
+
+.rive-live-palette select,
+.rive-live-palette input[type="text"],
+.rive-live-palette input[type="number"] {
+  color: var(--color-text-light-highlight, #f0f0e0);
+  background: var(--color-cool-4, #302831);
+  border: 1px solid var(--color-cool-3, #47404a);
+}
+
+.rive-live-palette select option {
+  color: var(--color-text-dark-primary, #191813);
+  background: var(--color-bg-option, #f0f0e0);
 }
 
 .rive-number {
