@@ -55,7 +55,9 @@ export class RivePageModel extends foundry.abstract.TypeDataModel {
         name: new StringField({ required: true, blank: false }),
         uuid: new StringField({ required: true, blank: true, initial: "" }),
         path: new StringField({ required: true, blank: true, initial: "" })
-      }))
+      })),
+      // Items ("property:name", "input:name") kept out of the GM live controls.
+      liveHidden: new ArrayField(new StringField({ required: true, blank: false }))
     };
   }
 

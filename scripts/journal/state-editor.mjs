@@ -1,10 +1,15 @@
 import { describe } from "../state.mjs";
+import { attachSuggestions } from "../suggest.mjs";
 
 /**
  * Builds controls for a loaded file's state machine inputs and view model
  * properties. Used two ways:
- *  - edit sheet: values are saved to the page as defaults (with reset and binding rows)
- *  - live panel: a GM drives the animation for everyone viewing it (continuous, nothing saved)
+ *  - settings (journal page editor, tile/token Rive tab): values are saved as
+ *    defaults; each property shows either its value or its binding, switched by
+ *    a toggle; tiles and tokens can also hide items from the live controls
+ *  - live controls: a GM drives the animation for everyone viewing it
+ *    (continuous, nothing saved); hidden and bound items aren't shown
+ * Both use the same rows: label and type, the control, then small side controls.
  * Controls are unnamed, so a surrounding sheet form never submits them.
  *
  * @param {HTMLElement} container
@@ -14,17 +19,22 @@ import { describe } from "../state.mjs";
  * @param {(kind, name, value) => void} config.onChange         value is null for "reset"
  * @param {(kind, name) => void} config.onFire
  * @param {boolean} [config.live=false]                         report every slider step, hide reset
- * @param {{list: object[], onChange: (name, binding) => void}} [config.bindings]
- * @param {Set<string>} [config.hiddenProperties]               property names not to show (e.g. bound ones, live)
+ * @param {{list: object[], onChange: (name, binding) => void, target?: "token"|"tile"|"page"}} [config.bindings]
+ *   settings: value-or-binding toggle; `target` decides which suggestions make sense
+ * @param {{hidden: Set<string>, onChange: (key, hidden) => void}} [config.visibility]  settings: eye toggles (keys "kind:name")
+ * @param {Set<string>} [config.hide]                           live: item keys ("kind:name") not to show
+ * @param {string} [config.emptyText]                           shown when there's nothing to show
  */
-export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings, hiddenProperties }) {
+export function renderStateEditor(container, player, { values, onChange, onFire, live = false, bindings, visibility, hide, emptyText }) {
   const described = describe(player);
-  const inputs = described.inputs;
-  const properties = described.properties.filter(p => !hiddenProperties?.has(p.name));
+  const shown = (kind, item) => !hide?.has(itemKey(kind, item.name));
+  const inputs = described.inputs.filter(i => shown("input", i));
+  const properties = described.properties.filter(p => shown("property", p));
   container.replaceChildren();
+  container.classList.add("rive-state-editor");
+  container.classList.toggle("rive-live-editor", live);
   if (!inputs.length && !properties.length) {
-    const allHidden = described.properties.length > 0;
-    container.append(hint(game.i18n.localize(allHidden ? "FOUNDRY_RIVE.LiveAllBound" : "FOUNDRY_RIVE.NoState")));
+    container.append(hint(emptyText ?? game.i18n.localize("FOUNDRY_RIVE.NoState")));
     return;
   }
   const boundBy = new Map((bindings?.list ?? []).map(b => [b.name, b]));
@@ -33,23 +43,38 @@ export function renderStateEditor(container, player, { values, onChange, onFire,
     if (!items.length) return;
     container.append(headingEl(heading));
     for (const item of items) {
+      const key = itemKey(kind, item.name);
+      let main;
+      let reset = null;
       if (item.type === "trigger") {
-        container.append(row(item.name, item.type, fireButton(() => onFire(kind, item.name)), null));
-        continue;
+        main = fireButton(() => onFire(kind, item.name));
+      } else {
+        const overridden = values[kind].has(item.name);
+        const current = overridden ? values[kind].get(item.name) : item.value;
+        main = valueControl(item.type, current, item.options, live, value => onChange(kind, item.name, value));
+        Object.assign(main.dataset, { riveKind: kind, riveName: item.name });
+        if (!live && overridden) reset = resetButton(() => onChange(kind, item.name, null));
       }
-      const overridden = values[kind].has(item.name);
-      const current = overridden ? values[kind].get(item.name) : item.value;
-      const control = valueControl(item.type, current, item.options, live, value => onChange(kind, item.name, value));
-      Object.assign(control.dataset, { riveKind: kind, riveName: item.name });
-      const reset = !live && overridden ? () => onChange(kind, item.name, null) : null;
-      container.append(row(item.name, item.type, control, reset));
-      if (bindings && kind === "property") {
-        container.append(bindingRow(boundBy.get(item.name), binding => bindings.onChange(item.name, binding)));
+      const side = [];
+      let bindPane = null;
+      // Properties (not triggers) can follow Foundry data instead of a set value.
+      if (bindings && kind === "property" && item.type !== "trigger") {
+        const toggle = bindingToggle(item.name, boundBy.get(item.name), bindings.onChange, bindings.target);
+        bindPane = toggle.pane;
+        side.push(toggle.switch);
       }
+      if (visibility) side.push(eyeButton(key, visibility));
+      // The control shows the type (a colour box, a dropdown); only the settings spell it out.
+      container.append(row(item.name, live ? null : item.type, main, reset, bindPane, side));
     }
   };
   section("input", "FOUNDRY_RIVE.Inputs", inputs);
   section("property", "FOUNDRY_RIVE.Properties", properties);
+}
+
+/** "property:hp", "input:level": how items are named in hide / visibility sets. */
+export function itemKey(kind, name) {
+  return `${kind}:${name}`;
 }
 
 /**
@@ -64,12 +89,24 @@ export function showValue(container, kind, name, value) {
     if (input === document.activeElement) continue; // don't fight someone mid-edit
     if (input.type === "checkbox") input.checked = value === true || value === "true";
     else if (input.type === "range") {
-      const n = Number(value);
-      if (n > Number(input.max)) input.max = String(Math.ceil(n));
-      if (n < Number(input.min)) input.min = String(Math.floor(n));
+      const { min, max } = sliderRange(Number(value), Number(input.min), Number(input.max));
+      Object.assign(input, { min: String(min), max: String(max) });
       input.value = String(value);
     } else input.value = String(value ?? "");
   }
+}
+
+/**
+ * Slider range for a number: 0–100 by default, grown in powers of ten to hold
+ * the value (250 gives 0–1000, -5 gives -100–100), and never shrunk below a
+ * range it already has.
+ */
+export function sliderRange(value, min = 0, max = 100) {
+  const n = Number.isFinite(value) ? value : 0;
+  const span = magnitude => 10 ** Math.max(2, Math.ceil(Math.log10(Math.abs(magnitude) + 1)));
+  const lo = Math.min(Number.isFinite(min) ? min : 0, n < 0 ? -span(n) : 0);
+  const hi = Math.max(Number.isFinite(max) ? max : 100, n > 0 ? span(n) : 100);
+  return { min: lo, max: hi };
 }
 
 function valueControl(type, value, options, live, onChange) {
@@ -81,9 +118,12 @@ function valueControl(type, value, options, live, onChange) {
       el = Object.assign(document.createElement("input"), { type: "number", step: "any", value: value ?? "" });
       if (live) {
         // A slider is easier to drive live; keep the number box beside it for exact values.
-        const range = Object.assign(document.createElement("input"), { type: "range", min: 0, max: 100, step: "any", value: value ?? 0 });
-        const widen = n => { if (n > Number(range.max)) range.max = String(Math.ceil(n)); if (n < Number(range.min)) range.min = String(Math.floor(n)); };
-        widen(Number(value) || 0);
+        const { min, max } = sliderRange(Number(value));
+        const range = Object.assign(document.createElement("input"), { type: "range", min, max, step: "any", value: value ?? 0 });
+        const widen = n => {
+          const next = sliderRange(n, Number(range.min), Number(range.max));
+          Object.assign(range, { min: String(next.min), max: String(next.max) });
+        };
         range.addEventListener("input", () => { el.value = range.value; onChange(range.value); });
         el.addEventListener("input", () => { if (el.value === "") return; widen(Number(el.value)); range.value = el.value; onChange(el.value); });
         const wrap = document.createElement("div");
@@ -114,42 +154,87 @@ function valueControl(type, value, options, live, onChange) {
 }
 
 /**
- * Suggestions for binding fields, shared by every editor on the page:
- * `@actor` / `@token` for the document, and `status:<id>` for each status effect
- * (condition) this world defines.
+ * Suggestions for a binding's document field: `@actor` / `@token` mean the
+ * token's own actor and the token itself, so they're offered only on tokens.
+ * Tiles and journal pages have nothing to suggest (drop a document instead).
  */
-function ensureBindingSuggestions() {
-  if (document.getElementById("foundry-rive-binding-docs")) return;
-  const docs = document.createElement("datalist");
-  docs.id = "foundry-rive-binding-docs";
-  docs.append(
-    new Option(game.i18n.localize("FOUNDRY_RIVE.BindActorShorthand"), "@actor"),
-    new Option(game.i18n.localize("FOUNDRY_RIVE.BindTokenShorthand"), "@token")
-  );
-  const paths = document.createElement("datalist");
-  paths.id = "foundry-rive-binding-paths";
-  for (const status of CONFIG.statusEffects ?? []) {
-    if (!status?.id) continue;
-    paths.append(new Option(game.i18n.localize(status.name ?? status.label ?? status.id), `status:${status.id}`));
-  }
-  document.body.append(docs, paths);
+export function documentSuggestions(target) {
+  if (target !== "token") return [];
+  return [
+    { value: "@actor", label: game.i18n.localize("FOUNDRY_RIVE.BindActorShorthand") },
+    { value: "@token", label: game.i18n.localize("FOUNDRY_RIVE.BindTokenShorthand") }
+  ];
 }
 
-function bindingRow(binding, onChange) {
-  ensureBindingSuggestions();
+/**
+ * Suggestions for a binding's path field: `status:<id>` for each condition this
+ * world defines, but only when the document can have conditions (an actor or a
+ * token, by shorthand on a token or by UUID anywhere). Otherwise none.
+ */
+export function pathSuggestions(target, documentField) {
+  if (!canHaveConditions(target, documentField)) return [];
+  return (CONFIG.statusEffects ?? [])
+    .filter(status => status?.id)
+    .map(status => ({ value: `status:${status.id}`, label: game.i18n.localize(status.name ?? status.label ?? status.id) }));
+}
+
+function canHaveConditions(target, documentField) {
+  const value = String(documentField ?? "").trim();
+  if (value === "@actor" || value === "@token") return target === "token";
+  if (!value) return false;
+  let doc = null;
+  try {
+    doc = globalThis.fromUuidSync?.(value) ?? null;
+  } catch {
+    return false; // not a UUID (or one in a compendium that isn't loaded)
+  }
+  return ["Actor", "Token"].includes(doc?.documentName);
+}
+
+/**
+ * A property's switch between its value and a binding. On, the row shows the
+ * binding's document and path; off, the value. Turning it off removes the
+ * binding; turning it back on (before the editor is rebuilt) brings back what was
+ * typed, so a slip of the switch costs nothing.
+ */
+function bindingToggle(name, binding, onChange, target) {
+  const pane = bindingFields(binding, next => onChange(name, next), target);
+  const input = Object.assign(document.createElement("input"), { type: "checkbox", checked: Boolean(binding?.uuid || binding?.path) });
+  const sw = document.createElement("label");
+  sw.className = "rive-switch";
+  sw.dataset.tooltip = "FOUNDRY_RIVE.BindToggle";
+  sw.append(input, Object.assign(document.createElement("span"), { className: "rive-switch-track" }));
+  input.addEventListener("change", () => {
+    const row = sw.closest(".rive-row");
+    row?.classList.toggle("rive-bound", input.checked);
+    if (input.checked) {
+      const kept = pane.read();
+      if (kept.uuid || kept.path) onChange(name, kept);
+      pane.focus();
+    } else onChange(name, { uuid: "", path: "" });
+  });
+  return { switch: sw, pane: Object.assign(pane.element, { _riveBound: input.checked }) };
+}
+
+function bindingFields(binding, onChange, target) {
   const uuid = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.uuid ?? "",
-    placeholder: game.i18n.localize("FOUNDRY_RIVE.BindUuid")
+    placeholder: game.i18n.localize("FOUNDRY_RIVE.BindUuid"),
+    title: binding?.uuid ?? ""
   });
-  uuid.setAttribute("list", "foundry-rive-binding-docs");
   const path = Object.assign(document.createElement("input"), {
     type: "text",
     value: binding?.path ?? "",
-    placeholder: game.i18n.localize("FOUNDRY_RIVE.BindPath")
+    placeholder: game.i18n.localize("FOUNDRY_RIVE.BindPath"),
+    title: binding?.path ?? ""
   });
-  path.setAttribute("list", "foundry-rive-binding-paths");
-  const commit = () => onChange({ uuid: uuid.value.trim(), path: path.value.trim() });
+  const read = () => ({ uuid: uuid.value.trim(), path: path.value.trim() });
+  const commit = () => {
+    uuid.title = uuid.value;
+    path.title = path.value;
+    onChange(read());
+  };
   uuid.addEventListener("change", commit);
   path.addEventListener("change", commit);
   // Dropping a document (an Actor from the sidebar, say) fills in its UUID.
@@ -161,46 +246,84 @@ function bindingRow(binding, onChange) {
     uuid.value = data.uuid;
     commit();
   });
-
-  const el = document.createElement("div");
-  el.className = "form-group rive-binding";
-  const label = document.createElement("label");
-  label.textContent = game.i18n.localize("FOUNDRY_RIVE.BindTo");
-  const fields = document.createElement("div");
-  fields.className = "form-fields";
-  fields.append(uuid, path);
-  el.append(label, fields);
-  return el;
+  const element = document.createElement("div");
+  element.className = "rive-bind";
+  element.append(
+    attachSuggestions(uuid, () => documentSuggestions(target)),
+    attachSuggestions(path, () => pathSuggestions(target, uuid.value))
+  );
+  return { element, read, focus: () => (uuid.value ? path : uuid).focus() };
 }
 
-function row(name, type, control, onReset) {
+/** Tiles and tokens: whether an item appears in the live controls. */
+function eyeButton(key, visibility) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "rive-eye";
+  const paint = () => {
+    const hidden = visibility.hidden.has(key);
+    button.classList.toggle("hidden-live", hidden);
+    button.dataset.tooltip = hidden ? "FOUNDRY_RIVE.LiveShow" : "FOUNDRY_RIVE.LiveHide";
+    button.innerHTML = `<i class="fa-solid ${hidden ? "fa-eye-slash" : "fa-eye"}"></i>`;
+  };
+  paint();
+  button.addEventListener("click", () => {
+    const hidden = !visibility.hidden.has(key);
+    if (hidden) visibility.hidden.add(key);
+    else visibility.hidden.delete(key);
+    paint();
+    visibility.onChange(key, hidden);
+  });
+  return button;
+}
+
+function row(name, type, main, reset, bindPane, side) {
   const el = document.createElement("div");
-  el.className = "form-group";
+  el.className = "form-group rive-row";
   const label = document.createElement("label");
   label.textContent = name;
-  const typeTag = document.createElement("span");
-  typeTag.className = "rive-type";
-  typeTag.textContent = type;
-  label.append(" ", typeTag);
+  label.title = name;
+  if (type) {
+    const typeTag = document.createElement("span");
+    typeTag.className = "rive-type";
+    typeTag.textContent = type;
+    label.append(" ", typeTag);
+  }
   const fields = document.createElement("div");
   fields.className = "form-fields";
-  fields.append(control);
-  if (onReset) {
-    const reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "rive-reset";
-    reset.dataset.tooltip = "FOUNDRY_RIVE.Reset";
-    reset.innerHTML = `<i class="fa-solid fa-rotate-left"></i>`;
-    reset.addEventListener("click", onReset);
-    fields.append(reset);
+  const value = document.createElement("div");
+  value.className = "rive-value";
+  value.append(main);
+  if (reset) value.append(reset);
+  fields.append(value);
+  if (bindPane) {
+    fields.append(bindPane);
+    el.classList.toggle("rive-bound", bindPane._riveBound);
+  }
+  if (side.length) {
+    const sideEl = document.createElement("div");
+    sideEl.className = "rive-side";
+    sideEl.append(...side);
+    fields.append(sideEl);
   }
   el.append(label, fields);
   return el;
 }
 
+function resetButton(onReset) {
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "rive-reset";
+  reset.dataset.tooltip = "FOUNDRY_RIVE.Reset";
+  reset.innerHTML = `<i class="fa-solid fa-rotate-left"></i>`;
+  reset.addEventListener("click", onReset);
+  return reset;
+}
+
 function fireButton(onFire) {
   const button = document.createElement("button");
   button.type = "button";
+  button.className = "rive-fire";
   button.textContent = game.i18n.localize("FOUNDRY_RIVE.Fire");
   button.addEventListener("click", onFire);
   return button;

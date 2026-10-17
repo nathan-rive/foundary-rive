@@ -6,7 +6,7 @@
 # them by accident. Every normal release also replaces the assets on the
 # rolling "channel-<CHANNEL>" release (itself a pre-release, so releases/latest
 # is unaffected). Foundry v12 servers install from:
-#   https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json
+#   https://github.com/nathan-rive/foundry-rive/releases/download/channel-v12/module.json
 # Pre-releases (spikes, tests) keep a manifest pointing at their own tag and
 # never touch the channel.
 name: Release

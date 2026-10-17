@@ -32,8 +32,8 @@
       }
     ]
   },
-  "url": "https://github.com/nathan-rive/foundary-rive",
-  "manifest": "https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json",
-  "download": "https://github.com/nathan-rive/foundary-rive/releases/download/v0.0.0/module.zip",
+  "url": "https://github.com/nathan-rive/foundry-rive",
+  "manifest": "https://github.com/nathan-rive/foundry-rive/releases/download/channel-v12/module.json",
+  "download": "https://github.com/nathan-rive/foundry-rive/releases/download/v0.0.0/module.zip",
   "license": "MIT"
 }

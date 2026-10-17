@@ -1,6 +1,7 @@
 import * as sync from "./sync.mjs";
 import { fireInput, setProperty } from "./state.mjs";
-import { renderStateEditor, showValue } from "./journal/state-editor.mjs";
+import { itemKey, renderStateEditor, showValue } from "./journal/state-editor.mjs";
+import { describe } from "./state.mjs";
 
 /**
  * The two ways a GM edits a Rive file's inputs and view model properties, shared
@@ -11,10 +12,13 @@ import { renderStateEditor, showValue } from "./journal/state-editor.mjs";
 
 /**
  * Editor for stored defaults: every change is saved; triggers only preview.
- * @param {(changes: {inputs?: object[], properties?: object[], bindings?: object[]}) => Promise} save
+ * With `liveHidden` (tiles and tokens), each item also gets an eye toggle that
+ * keeps it out of the live controls. `target` ("token", "tile" or "page") picks
+ * the binding suggestions that make sense there.
+ * @param {(changes: {inputs?: object[], properties?: object[], bindings?: object[], liveHidden?: string[]}) => Promise} save
  */
-export function renderDefaultsEditor(container, player, { inputs = [], properties = [], bindings = [] }, save) {
-  const edits = defaultsEdits({ inputs, properties, bindings }, save);
+export function renderDefaultsEditor(container, player, { inputs = [], properties = [], bindings = [], liveHidden }, save, { target } = {}) {
+  const edits = defaultsEdits({ inputs, properties, bindings, liveHidden }, save);
   renderStateEditor(container, player, {
     values: {
       input: new Map(inputs.map(e => [e.name, e.value])),
@@ -22,7 +26,8 @@ export function renderDefaultsEditor(container, player, { inputs = [], propertie
     },
     onChange: edits.setValue,
     onFire: (kind, name) => (kind === "input" ? fireInput(player, name) : setProperty(player, name, true)),
-    bindings: { list: bindings, onChange: edits.setBinding }
+    bindings: { list: bindings, onChange: edits.setBinding, target },
+    visibility: liveHidden ? { hidden: new Set(liveHidden), onChange: edits.setLiveHidden } : undefined
   });
 }
 
@@ -32,8 +37,8 @@ export function renderDefaultsEditor(container, player, { inputs = [], propertie
  * sheets do), so building on the lists it passed in would let a second edit
  * undo the first.
  */
-export function defaultsEdits({ inputs = [], properties = [], bindings = [] }, save) {
-  const lists = { inputs: [...inputs], properties: [...properties], bindings: [...bindings] };
+export function defaultsEdits({ inputs = [], properties = [], bindings = [], liveHidden = [] }, save) {
+  const lists = { inputs: [...inputs], properties: [...properties], bindings: [...bindings], liveHidden: [...liveHidden] };
   const commit = (key, next) => {
     lists[key] = next;
     return save({ [key]: next });
@@ -50,6 +55,12 @@ export function defaultsEdits({ inputs = [], properties = [], bindings = [] }, s
       const next = lists.bindings.filter(b => b.name !== name);
       if (binding.uuid || binding.path) next.push({ name, ...binding });
       return commit("bindings", next);
+    },
+    /** key is itemKey(kind, name); hidden items stay out of the live controls. */
+    setLiveHidden(key, hidden) {
+      const next = lists.liveHidden.filter(k => k !== key);
+      if (hidden) next.push(key);
+      return commit("liveHidden", next);
     }
   };
 }
@@ -60,24 +71,41 @@ export function boundPropertyNames(bindings = []) {
 }
 
 /**
+ * What the live controls leave out: bound properties (they follow their data,
+ * and a live change would only make them disagree with it) and anything hidden
+ * with the eye on a tile's or token's Rive tab. Counts only items the file has.
+ * @returns {{hide: Set<string>, bound: number, hidden: number}}
+ */
+export function liveExclusions(player, { bindings = [], liveHidden = [] }) {
+  const { inputs, properties } = describe(player);
+  const present = new Set([...inputs.map(i => itemKey("input", i.name)), ...properties.map(p => itemKey("property", p.name))]);
+  const bound = [...boundPropertyNames(bindings)].map(name => itemKey("property", name)).filter(k => present.has(k));
+  const hidden = liveHidden.filter(k => present.has(k) && !bound.includes(k));
+  return { hide: new Set([...bound, ...hidden]), bound: bound.length, hidden: hidden.length };
+}
+
+/**
  * GM live controls: changes play for every client viewing `target` (a document
  * UUID) and are not saved. Stays current when another GM changes a value.
- * Bound properties aren't shown: they follow their data, and a live change would
- * only make them disagree with it.
+ * Bound and hidden items aren't shown (see liveExclusions); `note`, if given, says
+ * how many and why, and is emptied when nothing is left out.
  * @returns {() => void} stops listening; also runs when the player is destroyed
  */
-export function mountLiveControls(container, player, { target, inputs = [], properties = [], bindings = [] }) {
+export function mountLiveControls(container, player, { target, inputs = [], properties = [], bindings = [], liveHidden = [], note }) {
   const known = sync.knownValues(target);
   const withStored = (list, map) => {
     for (const e of list) if (!map.has(e.name)) map.set(e.name, e.value);
     return map;
   };
+  const excluded = liveExclusions(player, { bindings, liveHidden });
+  if (note) note.textContent = liveNoteText(excluded);
   renderStateEditor(container, player, {
     values: { input: withStored(inputs, known.input), property: withStored(properties, known.property) },
     onChange: (kind, name, value) => sync.set(target, kind, name, value),
     onFire: (kind, name) => sync.fire(target, kind, name),
     live: true,
-    hiddenProperties: boundPropertyNames(bindings)
+    hide: excluded.hide,
+    emptyText: game.i18n.localize(excluded.hide.size ? "FOUNDRY_RIVE.LiveAllBound" : "FOUNDRY_RIVE.NoState")
   });
   const hookId = Hooks.on(sync.CHANGED_HOOK, (changed, kind, name, value) => {
     if (changed === target) showValue(container, kind, name, value);
@@ -90,6 +118,14 @@ export function mountLiveControls(container, player, { target, inputs = [], prop
   };
   player.onDestroy(stop);
   return stop;
+}
+
+/** "2 bound values aren't shown; they follow their data. 9 hidden in the Rive tab." or "". */
+export function liveNoteText({ bound, hidden }) {
+  const parts = [];
+  if (bound) parts.push(game.i18n.format(bound === 1 ? "FOUNDRY_RIVE.LiveBoundOne" : "FOUNDRY_RIVE.LiveBoundMany", { count: bound }));
+  if (hidden) parts.push(game.i18n.format(hidden === 1 ? "FOUNDRY_RIVE.LiveHiddenOne" : "FOUNDRY_RIVE.LiveHiddenMany", { count: hidden }));
+  return parts.join(" ");
 }
 
 /** Stored lists with the current live values for `target` written over them (bound properties excluded). */

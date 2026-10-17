@@ -8,7 +8,7 @@ In Foundry's setup screen, open **Add-on Modules → Install Module** and paste 
 
 | Foundry | Manifest URL |
 | --- | --- |
-| v12 | `https://github.com/nathan-rive/foundary-rive/releases/download/channel-v12/module.json` |
+| v12 | `https://github.com/nathan-rive/foundry-rive/releases/download/channel-v12/module.json` |
 
 Each channel only ever offers releases built for that Foundry version, so Foundry's update check stays on the right line.
 
@@ -48,6 +48,10 @@ Quote values that contain spaces.
 Open a tile's configuration and use the **Rive** tab to choose a Rive file, artboard, state machine and fit. The tile's own image stays underneath as a fallback; a tile with no image gets a transparent one so Foundry still draws it. Below the file settings you can set default values for the file's inputs and view model properties, and bind properties to Foundry data (drop a document on the UUID field, then give a data path such as `system.attributes.hp.value`).
 
 **Layout fit:** the other fits scale the artboard into the tile, so a bigger tile shows the same picture bigger (or stretched). **Layout (resize the artboard)** instead makes the artboard the tile's size in scene units (a token's: its size in grid squares times the grid size), as when you resize the artboard in the Rive editor. A file laid out for its size, with Rive layouts or a script that fills the artboard, then keeps its elements the same size on the scene and fits more of them as the tile grows; zooming in only makes it sharper. On journal pages and inline embeds (`fit=layout`) the artboard takes the size of its box in screen pixels; with the aspect ratio on **auto**, the box keeps the artboard's designed proportions.
+
+**Values and bindings:** each property on the Rive tab shows either its default value or, with the small toggle on its right switched on, its binding (a document and a data path) — a bound property follows its data, so it has no value of its own to set. The eye next to it (here and in a Rive journal page's settings) decides whether the property appears in the live controls: hide the ones you set once and never change during play, so the controls only show what you drive live.
+
+**Live controls:** select a Rive tile or token and click the Rive button on its HUD. The panel opens beside the HUD, like the conditions palette, and closes when you deselect. Changes play for everyone on the scene right away; the save button keeps the current values as the defaults. Bound and hidden values aren't listed.
 
 As GM, the tile's HUD has a Rive button that opens live controls: changes play on the tile for everyone viewing the scene, and **Save current values as defaults** stores them on the tile.
 
@@ -161,7 +165,7 @@ Rive for Foundry only writes its own data, and only when you use it:
 | What | When |
 | --- | --- |
 | Journal pages of the **Rive** type (their settings, defaults and bindings) | When you create or edit a Rive page, or a GM saves live values as defaults |
-| `flags.foundry-rive` on tiles and tokens (Rive file, artboard, state machine, fit, defaults, bindings) | When you edit a tile's or token's **Rive** tab, a GM saves live values as defaults, or a Monk's Active Tile Triggers **Set Rive value** action with **Remember** runs |
+| `flags.foundry-rive` on tiles and tokens (Rive file, artboard, state machine, fit, defaults, bindings, which values the live controls show) | When you edit a tile's or token's **Rive** tab, a GM saves live values as defaults, or a Monk's Active Tile Triggers **Set Rive value** action with **Remember** runs |
 | `prototypeToken.flags.foundry-rive` on actors | When you edit the **Rive** tab of an actor's prototype token |
 | A tile's image, set to a transparent placeholder | Only for a Rive tile that has no image of its own (Foundry needs an image to draw a tile) |
 | Uploaded `.riv.json` files in `rive/<world-id>/` in your user data folder | When someone with upload permission uses an upload button |

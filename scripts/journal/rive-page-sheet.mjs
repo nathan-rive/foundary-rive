@@ -7,6 +7,7 @@ import { applyInitialState, bindProperties } from "../state.mjs";
 import * as sync from "../sync.mjs";
 import { mountLiveControls, renderDefaultsEditor, withLiveValues } from "../live-controls.mjs";
 import { refusedScriptsText } from "../notices.mjs";
+import { showPathEnd } from "../suggest.mjs";
 
 /**
  * v12 (AppV1) sheet for "foundry-rive.rive" pages. The journal sheet renders it
@@ -45,6 +46,9 @@ export class RivePageSheet extends JournalPageSheet {
     const canvas = html.find("canvas.rive-canvas")[0];
     if (canvas) this.#mount(canvas, html);
     if (this.isEditable) {
+      const src = html.find("input[name='system.src']")[0];
+      showPathEnd(src);
+      src?.addEventListener("change", () => showPathEnd(src));
       html.find(".rive-upload-button").on("click", () => html.find("input.rive-upload")[0]?.click());
       html.find("input.rive-upload").on("change", event => this.#onUpload(event));
     }
@@ -89,13 +93,13 @@ export class RivePageSheet extends JournalPageSheet {
     renderDefaultsEditor(container, player, this.document.system, changes => {
       const update = Object.fromEntries(Object.entries(changes).map(([key, list]) => [`system.${key}`, list]));
       return this.document.update(update);
-    });
+    }, { target: "page" });
   }
 
   /** Journal view, GM only: drive the animation live for every client viewing this page. */
   #renderLivePanel(container, html, player) {
-    const { inputs, properties, bindings } = this.document.system;
-    mountLiveControls(container, player, { target: this.document.uuid, inputs, properties, bindings });
+    const { inputs, properties, bindings, liveHidden } = this.document.system;
+    mountLiveControls(container, player, { target: this.document.uuid, inputs, properties, bindings, liveHidden, note: html.find(".rive-live-note")[0] });
     html.find(".rive-live-save").on("click", () => this.#saveLiveAsDefaults());
   }
 

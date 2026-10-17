@@ -6,6 +6,7 @@ import { renderDefaultsEditor } from "../live-controls.mjs";
 import { hasDynamicRing, riveState } from "./rive-canvas.mjs";
 import { findTabSlot } from "./tab-slot.mjs";
 import { refusedScriptsText } from "../notices.mjs";
+import { showPathEnd } from "../suggest.mjs";
 
 /**
  * Adds a "Rive" tab to the v12 (AppV1) Tile and Token config sheets (including a
@@ -86,30 +87,31 @@ function injectTab(app, root) {
   tab.className = "tab";
   tab.dataset.tab = "rive";
   if (group) tab.dataset.group = group;
+  // Artboard and state machine are dropdowns; until the file has loaded they hold
+  // only "file default" and the saved choice, then fillChoices adds the file's own.
+  const savedOption = value => (value ? `<option value="${esc(value)}" selected>${esc(value)}</option>` : "");
   tab.innerHTML = `
     <p class="notes">${i18n(isToken ? "TokenHint" : "TileHint")}</p>
     ${isToken && hasDynamicRing(app.object) ? `<p class="notification warning">${i18n("TokenRingWarning")}</p>` : ""}
     <div class="form-group">
       <label>${i18n("Source")}</label>
       <div class="form-fields">
-        <input type="text" name="flags.${MODULE_ID}.src" value="${esc(flags.src)}" placeholder="rive/world/file.riv.json">
+        <input type="text" class="rive-src" name="flags.${MODULE_ID}.src" value="${esc(flags.src)}" title="${esc(flags.src)}" placeholder="rive/world/file.riv.json">
         <button type="button" class="rive-browse" data-tooltip="FILES.BrowseTooltip" tabindex="-1"><i class="fa-solid fa-file-import fa-fw"></i></button>
         ${game.user.can("FILES_UPLOAD") ? `<button type="button" class="rive-upload-button" data-tooltip="FOUNDRY_RIVE.Upload" tabindex="-1"><i class="fa-solid fa-upload fa-fw"></i></button><input type="file" class="rive-upload" accept=".riv" hidden>` : ""}
       </div>
-      <p class="hint">${i18n("TileSourceHint")}</p>
+      <p class="hint">${i18n(isToken ? "TokenSourceHint" : "TileSourceHint")}</p>
     </div>
     <div class="form-group">
       <label>${i18n("Artboard")}</label>
       <div class="form-fields">
-        <input type="text" name="flags.${MODULE_ID}.artboard" value="${esc(flags.artboard)}" list="${app.id}-rive-artboards" placeholder="${i18n("FileDefault")}">
-        <datalist id="${app.id}-rive-artboards"></datalist>
+        <select name="flags.${MODULE_ID}.artboard"><option value="">${i18n("FileDefault")}</option>${savedOption(flags.artboard)}</select>
       </div>
     </div>
     <div class="form-group">
       <label>${i18n("StateMachine")}</label>
       <div class="form-fields">
-        <input type="text" name="flags.${MODULE_ID}.stateMachine" value="${esc(flags.stateMachine)}" list="${app.id}-rive-sms" placeholder="${i18n("FileDefault")}">
-        <datalist id="${app.id}-rive-sms"></datalist>
+        <select name="flags.${MODULE_ID}.stateMachine"><option value="">${i18n("FileDefault")}</option>${savedOption(flags.stateMachine)}</select>
       </div>
     </div>
     <div class="form-group">
@@ -124,6 +126,7 @@ function injectTab(app, root) {
 
   const srcInput = tab.querySelector(`input[name="flags.${MODULE_ID}.src"]`);
   const status = tab.querySelector(".rive-status");
+  showPathEnd(srcInput);
 
   tab.querySelector(".rive-browse").addEventListener("click", () => {
     new FilePicker({
@@ -151,9 +154,17 @@ function injectTab(app, root) {
 
   // Suggest the file's artboards and state machines once we know the file, and
   // list its inputs and properties for defaults and bindings.
-  const suggest = () => loadPreview(app, srcInput.value, tab, status);
+  const suggest = () => {
+    showPathEnd(srcInput);
+    loadPreview(app, srcInput.value, tab, status);
+  };
   srcInput.addEventListener("change", suggest);
   if (srcInput.value) suggest();
+  // The state machine list depends on the artboard.
+  tab.querySelector(`select[name="flags.${MODULE_ID}.artboard"]`).addEventListener("change", () => {
+    const player = previews.get(app.id);
+    if (player) fillChoices(tab, player.contents);
+  });
 
   // AppV1 tabs bind by delegation, so the new tab works. Track which tab is open,
   // and reopen the Rive tab after a re-render if it was the open one.
@@ -174,11 +185,7 @@ function injectTab(app, root) {
  */
 async function loadPreview(app, src, tab, status) {
   releasePreview(app.id);
-  const artboards = tab.querySelector(`#${CSS.escape(`${app.id}-rive-artboards`)}`);
-  const sms = tab.querySelector(`#${CSS.escape(`${app.id}-rive-sms`)}`);
   const stateSection = tab.querySelector(".rive-state");
-  artboards.replaceChildren();
-  sms.replaceChildren();
   stateSection.replaceChildren();
   if (!src) return;
   const flags = app.object.flags?.[MODULE_ID] ?? {};
@@ -200,17 +207,34 @@ async function loadPreview(app, src, tab, status) {
   if (!tab.isConnected) return player.destroy();
   previews.set(app.id, player);
   status.textContent = refusedScriptsText(player);
+  fillChoices(tab, player.contents);
 
-  const boards = player.contents?.artboards ?? [];
-  artboards.append(...boards.map(a => new Option(a.name, a.name)));
-  const names = [...new Set(boards.flatMap(a => a.stateMachines.map(s => s.name)))];
-  sms.append(...names.map(n => new Option(n, n)));
-
-  const heading = document.createElement("h3");
-  heading.className = "rive-state-heading";
-  heading.textContent = game.i18n.localize("FOUNDRY_RIVE.TileDefaults");
   const body = document.createElement("div");
-  stateSection.append(heading, body);
-  renderDefaultsEditor(body, player, riveState(app.object), changes => saveFlags(app, changes));
+  stateSection.append(body);
+  const target = app.object?.documentName === "Token" || isPrototype(app) ? "token" : "tile";
+  renderDefaultsEditor(body, player, riveState(app.object), changes => saveFlags(app, changes), { target });
   app.setPosition({ height: "auto" });
+}
+
+/**
+ * Artboard and state machine dropdowns list what the loaded file contains (state
+ * machines of the chosen artboard), keeping the current choice even if the file
+ * no longer has it.
+ */
+function fillChoices(tab, contents) {
+  const boards = contents?.artboards ?? [];
+  const fill = (select, names) => {
+    if (!select) return;
+    const current = select.value;
+    const options = [...new Set([...names, ...(current ? [current] : [])])];
+    select.replaceChildren(
+      new Option(game.i18n.localize("FOUNDRY_RIVE.FileDefault"), ""),
+      ...options.map(n => new Option(n, n, false, n === current))
+    );
+    select.value = current;
+  };
+  const boardSelect = tab.querySelector(`select[name="flags.${MODULE_ID}.artboard"]`);
+  fill(boardSelect, boards.map(a => a.name));
+  const board = boards.find(a => a.name === boardSelect?.value) ?? boards[0];
+  fill(tab.querySelector(`select[name="flags.${MODULE_ID}.stateMachine"]`), board?.stateMachines.map(s => s.name) ?? []);
 }
